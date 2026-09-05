@@ -144,8 +144,9 @@ without a token.
 
 | name | required | description |
 |---|---|---|
-| `github_user` | yes | GitHub handle. A full profile URL works too. |
-| `resume_path` | yes | Resume file, or a folder of resumes. On Windows a `C:\...` path is translated to its WSL form automatically. |
+| `demo` | no | `true` runs against a bundled sample resume and a public account. Needs nothing else. |
+| `github_user` | unless `demo` | GitHub handle. A full profile URL works too. |
+| `resume_path` | unless `demo` | Resume file, or a folder of resumes. On Windows a `C:\...` path is translated to its WSL form automatically. |
 | `role` | no | `fullstack`, `backend`, `frontend`, `ml`, `devops`, `mobile`, `data`. Job titles work too, case-insensitively. |
 | `deep_dive` | no | Comma separated repository names to analyse in depth for bullets. |
 | `include_forks` | no | `true` to include forks. |

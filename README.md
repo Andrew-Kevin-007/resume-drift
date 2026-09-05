@@ -116,8 +116,9 @@ than letting you infer that your private work was checked.
 
 | name | required | description |
 |---|---|---|
-| `github_user` | yes | GitHub handle to scan. A full profile URL also works. |
-| `resume_path` | yes | Absolute path to a resume file, **or** a folder of resumes (newest non-cover-letter wins). On Windows, a `C:\...` path is translated to its `/mnt/c/...` WSL form automatically. |
+| `demo` | no | `true` runs against a bundled sample resume and a public account, with the baseline pinned. Needs nothing else. |
+| `github_user` | unless `demo` | GitHub handle to scan. A full profile URL also works. |
+| `resume_path` | unless `demo` | Absolute path to a resume file, **or** a folder of resumes (newest non-cover-letter wins). On Windows, a `C:\...` path is translated to its `/mnt/c/...` WSL form automatically. |
 | `role` | no | Rank the gap by fit. Tracks: `fullstack`, `backend`, `frontend`, `ml`, `devops`, `mobile`, `data`. Job titles work too and are case-insensitive — `Software Developer`, `SRE`, `Data Scientist`. Anything unrecognised falls back to newest-first and says so. |
 | `since` | no | Override the baseline as `YYYY-MM-DD`. Pass an empty `since=` to clear a previous override. |
 | `include_forks` | no | `true` to include forked repositories. |

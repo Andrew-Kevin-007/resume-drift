@@ -1,0 +1,6 @@
+# Claude Code worktrees and local session state
+.claude/
+
+# Python bytecode from local test runs of the resource scripts
+__pycache__/
+*.py[cod]
