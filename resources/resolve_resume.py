@@ -65,11 +65,23 @@ def main():
     if len(sys.argv) < 2:
         die("resolve_resume: missing resume_path argument")
 
-    raw = sys.argv[1]
-    if not raw or raw.startswith("$"):
+    raw = sys.argv[1] if len(sys.argv) > 1 else ""
+    demo_flag = (sys.argv[2] if len(sys.argv) > 2 else "").strip().lower()
+    demo_path = sys.argv[3] if len(sys.argv) > 3 else ""
+    demo = demo_flag in ("true", "1", "yes") and not demo_path.startswith("$")
+
+    if raw.startswith("$"):
+        raw = ""
+
+    # Demo mode exists so a first run needs no setup at all. It reads a sample
+    # resume that ships with the play, and says so in every line of the report.
+    if demo and demo_path:
+        raw = demo_path
+    elif not raw:
         die(
             "resolve_resume: resume_path was not supplied.\n"
-            "Pass an absolute path, e.g. resume_path=/home/you/Documents/resume.pdf"
+            "Pass an absolute path, e.g. resume_path=/home/you/Documents/resume.pdf\n"
+            "Or run with demo=true to see it work on a bundled sample resume first."
         )
 
     path = os.path.expanduser(raw.strip().strip('"'))
@@ -133,6 +145,7 @@ def main():
         "ok": True,
         "available": True,
         "source": source,
+        "demo": demo,
         "today_iso": time.strftime("%Y-%m-%d", time.localtime()),
         "input_path": os.path.abspath(path),
         # Stated, never silent: a path the play rewrote is a path the user did

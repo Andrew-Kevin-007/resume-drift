@@ -7,6 +7,14 @@ bullets say?**
 "missing" and "worth adding" are not the same thing. A project can be absent from your
 resume and still not belong there.
 
+**No setup for a first run.** A sample resume ships with the play:
+
+```
+rote play run andrew-kevin-007/project-shortlist demo=true
+```
+
+Then on your own resume and account:
+
 ```
 rote play run andrew-kevin-007/project-shortlist github_user=<you> resume_path=~/Documents/resume.pdf role=backend
 ```

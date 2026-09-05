@@ -273,3 +273,67 @@ Both count as separate submissions.
 post in Discord for visibility. Download counts across the whole registry were still in
 single digits at this point, so early visibility is worth real points against a criterion
 that is explicitly about adoption.
+
+---
+
+## 9. Demo mode, and why it was the highest-leverage thing left
+
+The judging criteria as the organisers stated them: does it run, can a stranger understand
+it, do people adopt it once published. The first was solved. The other two were both
+blocked by the same thing: **the first run asked too much.**
+
+A stranger scrolling Discord had to find their resume, work out its path, and handle WSL
+translation before seeing a single line of output. That converts interest into "later",
+and later never arrives.
+
+The registry agrees. Downloads at the time:
+
+| Play | Downloads | Setup required |
+|---|---|---|
+| `dotisacat/agent-resource-audit` | 12 | none, zero parameters |
+| `lgoyal6/claim-evidence-audit` | 3 | a document path |
+| `andrew-kevin-007/resume-drift` | 1 | two required parameters |
+
+The most-downloaded play in the registry takes no arguments at all. Two other authors had
+already reached the same conclusion independently: `satianurag/repo-fire-check` led its
+Discord post with `demo=true`, and `cmdr-chara/documentation-contract-referee` added a
+`demo=stale` fixture in v0.2.0.
+
+**What demo mode does.** `demo=true` runs against a sample resume bundled with the play and
+a real public GitHub account, with the baseline pinned. Both required parameters became
+optional. Every demo run says, in the first three lines, that it is a demo and how to point
+it at your own data.
+
+One detail that matters: a bundled file's modification time is its *install* time, so
+without a pinned baseline the sample resume always looks current and the demo produces an
+empty, pointless report. The pin is stated in the output rather than hidden.
+
+### A third instance of the same bug class
+
+Testing demo mode at exactly the moment the GitHub quota hit zero exposed the most
+interesting bug of the session. `GRE-API-APP` came back **WEAK, "no README"**. It had scored
+**STRONG, 16** an hour earlier. Nothing about the repository had changed.
+
+The README fetch had been refused by the rate limiter, and the code recorded that refusal as
+*evidence the README does not exist*.
+
+This is the third appearance of one failure mode in this project:
+
+1. `pdftotext` succeeding on a scanned PDF, empty text read as "your resume mentions none of
+   these projects".
+2. A truncated 65 KB payload parsing as null, read as "this account has no repositories".
+3. A rate-limited fetch, read as "this project has no README".
+
+In every case the code could not look, and reported what it would have reported had it
+looked and found nothing. None of the three crashed. All three produced confident,
+well-formatted, completely wrong output, which is the only failure mode that actually
+matters in a tool people are meant to trust.
+
+Fixed the same way each time: separate "could not look" from "looked and found nothing", and
+give the former its own visible state. A project whose evidence could not be read now
+returns NOT EXAMINED and is excluded from the verdict entirely.
+
+A related fix in the same pass: when GitHub cannot be read at all, the NEXT section used to
+advise "ship more before applying". That is advice about projects, offered by a run that
+read no projects. It now says the rate limit blocked the run and that no conclusion about
+the projects is implied.

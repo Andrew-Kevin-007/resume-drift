@@ -7,6 +7,16 @@ Two Rote Plays for keeping a resume honest about what you have actually built.
 | **`resume-drift`** (this README) | What have I shipped that my resume does not know about? |
 | **[`project-shortlist`](project-shortlist/)** | Which of my projects actually deserve the space, and what should the bullets say? |
 
+**Try either with no setup at all.** A sample resume ships with both plays, so a first
+run needs nothing from you:
+
+```
+rote play run andrew-kevin-007/resume-drift      demo=true
+rote play run andrew-kevin-007/project-shortlist demo=true
+```
+
+Then on your own resume and account:
+
 ```
 rote play run andrew-kevin-007/resume-drift      github_user=<you> resume_path=~/Documents/resume.pdf
 rote play run andrew-kevin-007/project-shortlist github_user=<you> resume_path=~/Documents/resume.pdf role=backend

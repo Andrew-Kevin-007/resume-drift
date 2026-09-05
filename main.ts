@@ -48,11 +48,11 @@
  * parameters:
  * - name: github_user
  *   param_type: string
- *   required: true
+ *   required: false
  *   description: GitHub handle to scan, e.g. octocat. A full profile URL works too.
  * - name: resume_path
  *   param_type: string
- *   required: true
+ *   required: false
  *   description: 'Absolute path to a resume file, or a folder of resumes (newest non-cover-letter wins). On Windows use the WSL form: /mnt/c/Users/<you>/Documents/resume.pdf - a C:\ path is translated automatically when it resolves.'
  * - name: role
  *   param_type: string
@@ -62,6 +62,10 @@
  *   param_type: string
  *   required: false
  *   description: Override the baseline as YYYY-MM-DD instead of the resume file timestamp. Pass an empty value to clear a previous override, which rote remembers between runs.
+ * - name: demo
+ *   param_type: string
+ *   required: false
+ *   description: 'Set to true to run with no setup at all, against a bundled sample resume and a public GitHub account. Use it once to see the shape of the answer, then pass your own github_user and resume_path.'
  * - name: include_forks
  *   param_type: string
  *   required: false
@@ -74,6 +78,8 @@
  *     - python3
  *     - '@resource{resolve_resume.py}'
  *     - $resume_path
+ *     - $demo
+ *     - '@resource{demo-resume.md}'
  *   fetch_repos:
  *     type: process.exec
  *     timeout_ms: 60000
@@ -86,6 +92,7 @@
  *     - '@resolve_resume{.stdout.text}'
  *     - $since
  *     - $include_forks
+ *     - $demo
  *   match_mentions:
  *     type: process.exec
  *     timeout_ms: 45000
@@ -373,9 +380,17 @@ if (reposData === null) brokenSteps.push(`fetch_repos (${STEP_HANDLES.fetch_repo
 
 // A required parameter left blank fails in whichever step reads it first, which
 // can point at the wrong input entirely. Name the real gap up front.
+const demoMode = ["true", "1", "yes"].includes(asParam("demo").toLowerCase());
 const missingRequired: string[] = [];
-if (!asParam("github_user")) missingRequired.push("github_user — your GitHub handle, e.g. octocat");
-if (!asParam("resume_path")) missingRequired.push("resume_path — path to your resume file or folder");
+if (!demoMode && !asParam("github_user")) {
+  missingRequired.push("github_user — your GitHub handle, e.g. octocat");
+}
+if (!demoMode && !asParam("resume_path")) {
+  missingRequired.push("resume_path — path to your resume file or folder");
+}
+if (missingRequired.length) {
+  missingRequired.push("or pass demo=true to see it run with no setup at all");
+}
 
 const abortedReport = brokenSteps.length
   ? [
@@ -403,6 +418,12 @@ const translatedFrom = resume?.["translated_from_windows_path"];
 
 lines.push("RESUME DRIFT");
 lines.push("");
+if (demoMode) {
+  lines.push("  DEMO RUN. A sample resume ships with this play, and the baseline is pinned,");
+  lines.push("  so this shows the shape of the answer without any setup. For your own answer:");
+  lines.push("  github_user=<your handle> resume_path=<your resume>");
+  lines.push("");
+}
 lines.push(`  ▸ ${verdict}`);
 if (resumeDate) {
   lines.push(`    resume  ${String(chosen["name"] ?? "?")}`);
@@ -493,7 +514,10 @@ if (excluded.length) {
 }
 
 lines.push(`  baseline   ${baselineSource}`);
-if (baselineSource.startsWith("since=")) {
+if (baselineSource.startsWith("demo")) {
+  lines.push("             a bundled file's timestamp is its install date, so the demo pins");
+  lines.push("             the baseline. Your own run uses your resume's own date.");
+} else if (baselineSource.startsWith("since=")) {
   lines.push("             rote remembers parameters between runs — pass an empty since= to clear");
 } else {
   lines.push("             a file timestamp is a proxy for when you last wrote it;");

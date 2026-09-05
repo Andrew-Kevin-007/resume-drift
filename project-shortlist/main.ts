@@ -47,11 +47,11 @@
  * parameters:
  * - name: github_user
  *   param_type: string
- *   required: true
+ *   required: false
  *   description: GitHub handle to scan, e.g. octocat. A full profile URL works too.
  * - name: resume_path
  *   param_type: string
- *   required: true
+ *   required: false
  *   description: Absolute path to a resume file, or a folder of resumes (newest non-cover-letter wins). On Windows a C:\ path is translated to its WSL /mnt form automatically when it resolves.
  * - name: role
  *   param_type: string
@@ -61,6 +61,10 @@
  *   param_type: string
  *   required: false
  *   description: Comma separated repository names to analyse in depth for XYZ bullets, e.g. Talos,AUCTUS,quorum. Confirm three or four after reading the shortlist.
+ * - name: demo
+ *   param_type: string
+ *   required: false
+ *   description: 'Set to true to run with no setup at all, against a bundled sample resume and a public GitHub account. Use it once to see the shape of the answer, then pass your own github_user and resume_path.'
  * - name: include_forks
  *   param_type: string
  *   required: false
@@ -77,6 +81,8 @@
  *     - python3
  *     - '@resource{resolve_resume.py}'
  *     - $resume_path
+ *     - $demo
+ *     - '@resource{demo-resume.md}'
  *   scan_and_score:
  *     type: process.exec
  *     timeout_ms: 180000
@@ -87,6 +93,7 @@
  *     - $include_forks
  *     - $deep_dive
  *     - $evidence_budget
+ *     - $demo
  *   match_mentions:
  *     type: process.exec
  *     timeout_ms: 45000
@@ -323,9 +330,17 @@ const brokenSteps: string[] = [];
 if (resume === null) brokenSteps.push(`resolve_resume (${STEP_HANDLES.resolve_resume.outcome.status})`);
 if (scan === null) brokenSteps.push(`scan_and_score (${STEP_HANDLES.scan_and_score.outcome.status})`);
 
+const demoMode = ["true", "1", "yes"].includes(asParam("demo").toLowerCase());
 const missingRequired: string[] = [];
-if (!asParam("github_user")) missingRequired.push("github_user — your GitHub handle, e.g. octocat");
-if (!asParam("resume_path")) missingRequired.push("resume_path — path to your resume file or folder");
+if (!demoMode && !asParam("github_user")) {
+  missingRequired.push("github_user — your GitHub handle, e.g. octocat");
+}
+if (!demoMode && !asParam("resume_path")) {
+  missingRequired.push("resume_path — path to your resume file or folder");
+}
+if (missingRequired.length) {
+  missingRequired.push("or pass demo=true to see it run with no setup at all");
+}
 
 let verdictLine: string;
 if (!scanAvailable) {
@@ -333,7 +348,9 @@ if (!scanAvailable) {
 } else if (mode === "deep_dive") {
   verdictLine = `Deep dive on ${deepData.length} project${deepData.length === 1 ? "" : "s"}`;
 } else {
-  verdictLine = `${include.length} project${include.length === 1 ? "" : "s"} earn a place on your resume`;
+  verdictLine = include.length === 1
+    ? "1 project earns a place on your resume"
+    : `${include.length} projects earn a place on your resume`;
 }
 
 if (brokenSteps.length) {
@@ -507,6 +524,12 @@ if (brokenSteps.length) {
   // ---------------- shortlist ----------------
   lines.push("PROJECT SHORTLIST");
   lines.push("");
+  if (demoMode) {
+    lines.push("  DEMO RUN. A sample resume ships with this play, so this shows the shape of");
+    lines.push("  the answer without any setup. For your own answer:");
+    lines.push("  github_user=<your handle> resume_path=<your resume>");
+    lines.push("");
+  }
   lines.push(`  ▸ ${verdictLine}`);
   lines.push(
     `    github  ${githubUser} · ${String(scan?.["live_repos"] ?? "?")} projects · ` +
@@ -571,7 +594,13 @@ if (brokenSteps.length) {
   }
 
   lines.push("NEXT");
-  if (include.length) {
+  if (!scanAvailable) {
+    // Never advise about projects that were never read. "Ship more" is nonsense
+    // when the real answer is "wait for the rate limit to reset".
+    lines.push("  Nothing was judged, because GitHub could not be read. Wait for the rate");
+    lines.push("  limit to reset, or set GITHUB_TOKEN to raise it, then run this again.");
+    lines.push("  No conclusion about your projects is implied by this run.");
+  } else if (include.length) {
     const top = include.slice(0, 4).map((e) => e.name);
     lines.push("  Pick the three or four you want, then re-run with:");
     lines.push(`    deep_dive=${top.join(",")}`);

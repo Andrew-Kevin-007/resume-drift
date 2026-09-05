@@ -90,12 +90,21 @@ def resolve_baseline(resume_json, since_param):
 
 def main():
     user = arg(1)
+    demo = arg(5).lower() in ("true", "1", "yes")
+    if not user and demo:
+        user = "Andrew-Kevin-007"
     if not user:
-        die("fetch_repos: github_user was not supplied. Pass github_user=<your-handle>")
+        die("fetch_repos: github_user was not supplied. Pass github_user=<your-handle>\n"
+            "Or run with demo=true to see it work on a sample account first.")
     if "github.com/" in user:  # people paste profile URLs
         user = user.rstrip("/").split("github.com/")[-1].split("/")[0]
 
-    baseline, baseline_source = resolve_baseline(arg(2), arg(3))
+    # A bundled file's timestamp is its install time, so in demo mode the baseline
+    # is pinned instead. Without this the sample resume always looks current and
+    # the demo shows an empty, pointless report.
+    baseline, baseline_source = resolve_baseline(arg(2), "2026-01-01" if demo else arg(3))
+    if demo:
+        baseline_source = "demo baseline, pinned to 2026-01-01"
     include_forks = arg(4).lower() in ("true", "1", "yes")
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or ""
 
@@ -184,6 +193,7 @@ def main():
         "ok": True,
         "available": True,
         "user": user,
+        "demo": demo,
         "authenticated": bool(token),
         "baseline": baseline,
         "baseline_source": baseline_source,

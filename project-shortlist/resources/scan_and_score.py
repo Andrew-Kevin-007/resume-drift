@@ -353,7 +353,9 @@ def gather_evidence(gh, owner, repo, deep):
           "x": None, "metrics": [], "deps": [], "manifest": None, "manifest_path": None, "highlights": [],
           "incomplete": False}
 
+    blocked_before = gh.rate_limited or gh.exhausted
     readme = gh.get("/repos/%s/%s/readme" % (owner, urllib.parse.quote(name)))
+    read_blocked = readme is None and (blocked_before or gh.rate_limited or gh.exhausted)
     text = ""
     if readme and readme.get("content"):
         try:
@@ -372,11 +374,20 @@ def gather_evidence(gh, owner, repo, deep):
             ev["signals"].append((2, "usable", "README documents install or usage"))
         if re.search(r"!\[[^\]]*\]\([^)]+\)", text):
             ev["signals"].append((1, "documented", "README includes an image or demo"))
+    elif read_blocked:
+        # Never convert a rate limit into a finding about the repository.
+        ev["incomplete"] = True
+        ev["flags"].append(
+            "not examined: the API budget or rate limit was reached before this "
+            "project could be read, so no verdict is offered")
     else:
         ev["flags"].append("no README: a reader cannot tell what it does")
 
+    tree_blocked_before = gh.rate_limited or gh.exhausted
     tree = gh.get("/repos/%s/%s/git/trees/%s?recursive=1"
                   % (owner, urllib.parse.quote(name), repo.get("default_branch") or "main"))
+    if tree is None and (tree_blocked_before or gh.rate_limited or gh.exhausted):
+        ev["incomplete"] = True
     if tree and isinstance(tree.get("tree"), list):
         paths = [t.get("path", "") for t in tree["tree"] if t.get("type") == "blob"]
         ev["paths"] = paths[:400]
@@ -440,8 +451,12 @@ def verdict_for(total, flags):
 
 def main():
     user = arg(1)
+    demo = arg(5).lower() in ("true", "1", "yes")
+    if not user and demo:
+        user = "Andrew-Kevin-007"
     if not user:
-        die("scan_and_score: github_user was not supplied. Pass github_user=<your-handle>")
+        die("scan_and_score: github_user was not supplied. Pass github_user=<your-handle>\n"
+            "Or run with demo=true to see it work on a sample account first.")
     if "github.com/" in user:
         user = user.rstrip("/").split("github.com/")[-1].split("/")[0]
 
@@ -451,6 +466,10 @@ def main():
         budget = max(4, min(50, int(arg(4) or "24")))
     except ValueError:
         budget = 24
+    if demo:
+        # Enough to show a real shortlist, while leaving most of an
+        # unauthenticated hourly quota (60) for the viewer's own runs.
+        budget = min(budget, 20)
 
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or ""
     gh = Gh(token, budget)
@@ -534,12 +553,13 @@ def main():
             "description": (repo.get("description") or "")[:160],
             "topics": (repo.get("topics") or [])[:6],
             "stars": repo.get("stargazers_count", 0),
-            "examined": bool(ev),
+            "examined": bool(ev) and not ev.get("incomplete"),
             "category": categorise(repo, ev["paths"], ev["deps"]) if ev else "not examined",
             "score": total,
             "signals": [{"points": p, "kind": k, "evidence": e} for p, k, e in signals],
             "flags": flags,
-            "verdict": verdict_for(total, flags) if ev else "NOT EXAMINED",
+            "verdict": ("NOT EXAMINED" if (not ev or ev.get("incomplete"))
+                        else verdict_for(total, flags)),
             "highlights": ev["highlights"] if ev else [],
         })
 
@@ -581,6 +601,7 @@ def main():
         "available": True,
         "mode": mode,
         "user": user,
+        "demo": demo,
         "authenticated": bool(token),
         "api_calls": gh.calls,
         "api_budget": gh.budget,
