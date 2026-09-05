@@ -4,7 +4,7 @@
  * @rote-frontmatter
  * ---
  * name: project-shortlist
- * description: 'Which of your projects actually deserve a place on your resume, and what should the bullets say? Judges every repository on a GitHub account against a printed evidence rubric - is it deployed, does it have a README that explains it, tests, CI, a real dependency set, sustained work rather than a one-day scaffold - and returns a ranked shortlist with a verdict per project. Projects ALREADY named on your resume are judged by the same rubric as the rest, because being listed is not evidence of being worth listing, so a thin project already on the page is told to go. Every score is the sum of named signals and every signal prints the evidence that earned it, so the total can be recomputed by hand; there is no generated score anywhere. Pass role= to rank for a track or a job title. Then confirm the three or four you want and re-run with deep_dive= to get, for each, an XYZ resume bullet assembled ONLY from measured facts: X quoted from the README, Z quoted from the dependency manifest, and Y left as an explicit printed gap when the repository contains no measured outcome, because inventing a number is the one thing a resume tool must never do. Bullets avoid em dashes. Read-only, writes nothing, needs no credentials; GITHUB_TOKEN only raises the rate limit. The GitHub API allows 60 unauthenticated requests an hour, so evidence spending is bounded, the bound is a parameter, and what went unexamined is always named. Needs python3; pdftotext enables PDF resume reading.'
+ * description: 'Which of your projects actually deserve a place on your resume, and what should the bullets say? Judges every repository on a GitHub account against a printed evidence rubric - is it deployed, does it have a README that explains it, tests, CI, a real dependency set, sustained work rather than a one-day scaffold - and returns a ranked shortlist with a verdict per project. Projects ALREADY named on your resume are judged by the same rubric as the rest, because being listed is not evidence of being worth listing, so a thin project already on the page is told to go. Every score is the sum of named signals and every signal prints the evidence that earned it, so the total can be recomputed by hand; there is no generated score anywhere. Pass role= to rank for a track or a job title. Then confirm the three or four you want and re-run with deep_dive= to get, for each, an XYZ resume bullet assembled ONLY from measured facts: X quoted from the README, Z quoted from the dependency manifest, and Y left as an explicit printed gap when the repository contains no measured outcome, because inventing a number is the one thing a resume tool must never do. Bullets avoid em dashes. Read-only, writes nothing, needs no credentials; GITHUB_TOKEN only raises the rate limit. The GitHub API allows 60 unauthenticated requests an hour, so evidence spending is bounded, the bound is a parameter, and what went unexamined is always named. Needs python3; pdftotext enables PDF resume reading. Run it with demo=true to see the whole thing work on a bundled sample resume and a public account, with no setup at all.'
  * source: https://github.com/Andrew-Kevin-007/resume-drift
  * tags:
  * - audience-developers
@@ -23,7 +23,7 @@
  *   - resume
  * metadata:
  *   rote_version: 0.78.0
- *   version: 0.1.1
+ *   version: 0.1.2
  *   status: released
  *   kind: atomic
  *   flow_type: parallel
@@ -64,7 +64,7 @@
  * - name: demo
  *   param_type: string
  *   required: false
- *   description: 'Set to true to run with no setup at all, against a bundled sample resume and a public GitHub account. Use it once to see the shape of the answer, then pass your own github_user and resume_path.'
+ *   description: Set to true to run with no setup at all, against a bundled sample resume and a public GitHub account. Use it once to see the shape of the answer, then pass your own github_user and resume_path.
  * - name: include_forks
  *   param_type: string
  *   required: false

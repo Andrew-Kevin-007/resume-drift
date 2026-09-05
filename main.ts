@@ -4,7 +4,7 @@
  * @rote-frontmatter
  * ---
  * name: resume-drift
- * description: 'What have you shipped that your resume does not know about? Compares a GitHub account against the date of your most recent resume file and reports the gap: which repositories were pushed after the resume was last written, which of those the resume never names, and which have a live deployment URL that appears nowhere in it. The baseline is the resume file''s own modification time, reported as a PROXY and overridable with since=YYYY-MM-DD, because cloud sync or a re-download can reset it. Mention detection reads the resume locally and emits one boolean per repository: no snippet, no contact detail and no document text ever leaves that step. A repository whose name is also an ordinary English word (studio, portfolio, core) is reported as WEAK evidence rather than asserted, and when no text extractor applies - or when one succeeds but recovers no readable text, as pdftotext does on a scanned or image-only PDF - every repository returns UNKNOWN instead of not-mentioned, because could-not-look and did-not-find are different answers. Pass role= to rank the gap by fit against a named track (backend, frontend, fullstack, ml, devops, mobile, data) using printed keyword evidence, never a generated score. Every excluded repository is reported with its reason and an exact count: forks, archived repositories, the profile README and empty repositories are named, never silently dropped. Offline except for one public GitHub call, read-only, writes nothing, needs no credentials; GITHUB_TOKEN is honoured only to raise the rate limit; private repositories are never counted, because this endpoint returns public repositories only with or without a token, and the report states that on every run. Needs python3; pdftotext enables PDF mention detection.'
+ * description: 'What have you shipped that your resume does not know about? Compares a GitHub account against the date of your most recent resume file and reports the gap: which repositories were pushed after the resume was last written, which of those the resume never names, and which have a live deployment URL that appears nowhere in it. The baseline is the resume file''s own modification time, reported as a PROXY and overridable with since=YYYY-MM-DD, because cloud sync or a re-download can reset it. Mention detection reads the resume locally and emits one boolean per repository: no snippet, no contact detail and no document text ever leaves that step. A repository whose name is also an ordinary English word (studio, portfolio, core) is reported as WEAK evidence rather than asserted, and when no text extractor applies - or when one succeeds but recovers no readable text, as pdftotext does on a scanned or image-only PDF - every repository returns UNKNOWN instead of not-mentioned, because could-not-look and did-not-find are different answers. Pass role= to rank the gap by fit against a named track (backend, frontend, fullstack, ml, devops, mobile, data) using printed keyword evidence, never a generated score. Every excluded repository is reported with its reason and an exact count: forks, archived repositories, the profile README and empty repositories are named, never silently dropped. Offline except for one public GitHub call, read-only, writes nothing, needs no credentials; GITHUB_TOKEN is honoured only to raise the rate limit; private repositories are never counted, because this endpoint returns public repositories only with or without a token, and the report states that on every run. Needs python3; pdftotext enables PDF mention detection. Run it with demo=true to see the whole thing work on a bundled sample resume and a public account, with no setup at all.'
  * source: https://github.com/Andrew-Kevin-007/resume-drift
  * tags:
  * - audience-developers
@@ -23,7 +23,7 @@
  *   - resume
  * metadata:
  *   rote_version: 0.78.0
- *   version: 0.1.4
+ *   version: 0.1.6
  *   status: released
  *   kind: atomic
  *   flow_type: parallel
@@ -65,7 +65,7 @@
  * - name: demo
  *   param_type: string
  *   required: false
- *   description: 'Set to true to run with no setup at all, against a bundled sample resume and a public GitHub account. Use it once to see the shape of the answer, then pass your own github_user and resume_path.'
+ *   description: Set to true to run with no setup at all, against a bundled sample resume and a public GitHub account. Use it once to see the shape of the answer, then pass your own github_user and resume_path.
  * - name: include_forks
  *   param_type: string
  *   required: false
