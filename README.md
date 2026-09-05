@@ -1,5 +1,26 @@
 # resume-drift
 
+Two Rote Plays for keeping a resume honest about what you have actually built.
+
+| Play | Answers |
+|---|---|
+| **`resume-drift`** (this README) | What have I shipped that my resume does not know about? |
+| **[`project-shortlist`](project-shortlist/)** | Which of my projects actually deserve the space, and what should the bullets say? |
+
+```
+rote play run andrew-kevin-007/resume-drift      github_user=<you> resume_path=~/Documents/resume.pdf
+rote play run andrew-kevin-007/project-shortlist github_user=<you> resume_path=~/Documents/resume.pdf role=backend
+```
+
+`resume-drift` finds the gap. `project-shortlist` decides what belongs in it, judging the
+projects already on your resume by the same rubric, and drafts XYZ bullets that match your
+resume's existing style without inventing a single number.
+
+See [NOTES.md](NOTES.md) for the build log: design decisions, the bugs found while testing,
+and the platform gotchas discovered along the way.
+
+---
+
 **What have you shipped that your resume doesn't know about?**
 
 You ship a project. You push it to GitHub. You deploy it to Vercel. You post about it.
