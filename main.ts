@@ -4,8 +4,8 @@
  * @rote-frontmatter
  * ---
  * name: resume-drift
- * description: "What have you shipped that your resume does not know about? Compares a GitHub account against the date of your most recent resume file and reports the gap: which repositories were pushed after the resume was last written, which of those the resume never names, and which have a live deployment URL that appears nowhere in it. The baseline is the resume file's own modification time, reported as a PROXY and overridable with since=YYYY-MM-DD, because cloud sync or a re-download can reset it. Mention detection reads the resume locally and emits one boolean per repository: no snippet, no contact detail and no document text ever leaves that step. A repository whose name is also an ordinary English word (studio, portfolio, core) is reported as WEAK evidence rather than asserted, and when no text extractor applies every repository returns UNKNOWN instead of not-mentioned, because could-not-look and did-not-find are different answers. Pass role= to rank the gap by fit against a named track (backend, frontend, fullstack, ml, devops, mobile, data) using printed keyword evidence, never a generated score. Every excluded repository is reported with its reason and an exact count: forks, archived repositories, the profile README and empty repositories are named, never silently dropped. Offline except for one public GitHub call, read-only, writes nothing, needs no credentials; GITHUB_TOKEN is honoured only to raise the rate limit. Needs python3; pdftotext enables PDF mention detection."
- * source: "https://github.com/Andrew-Kevin-007/resume-drift"
+ * description: 'What have you shipped that your resume does not know about? Compares a GitHub account against the date of your most recent resume file and reports the gap: which repositories were pushed after the resume was last written, which of those the resume never names, and which have a live deployment URL that appears nowhere in it. The baseline is the resume file''s own modification time, reported as a PROXY and overridable with since=YYYY-MM-DD, because cloud sync or a re-download can reset it. Mention detection reads the resume locally and emits one boolean per repository: no snippet, no contact detail and no document text ever leaves that step. A repository whose name is also an ordinary English word (studio, portfolio, core) is reported as WEAK evidence rather than asserted, and when no text extractor applies - or when one succeeds but recovers no readable text, as pdftotext does on a scanned or image-only PDF - every repository returns UNKNOWN instead of not-mentioned, because could-not-look and did-not-find are different answers. Pass role= to rank the gap by fit against a named track (backend, frontend, fullstack, ml, devops, mobile, data) using printed keyword evidence, never a generated score. Every excluded repository is reported with its reason and an exact count: forks, archived repositories, the profile README and empty repositories are named, never silently dropped. Offline except for one public GitHub call, read-only, writes nothing, needs no credentials; GITHUB_TOKEN is honoured only to raise the rate limit; private repositories are never counted, because this endpoint returns public repositories only with or without a token, and the report states that on every run. Needs python3; pdftotext enables PDF mention detection.'
+ * source: https://github.com/Andrew-Kevin-007/resume-drift
  * tags:
  * - audience-developers
  * - effect-read-only
@@ -23,8 +23,8 @@
  *   - resume
  * metadata:
  *   rote_version: 0.78.0
- *   version: 0.1.0
- *   status: draft
+ *   version: 0.1.4
+ *   status: released
  *   kind: atomic
  *   flow_type: parallel
  *   execution_model: steps_with_presentation
@@ -49,48 +49,54 @@
  * - name: github_user
  *   param_type: string
  *   required: true
- *   description: "GitHub handle to scan, e.g. octocat (a full profile URL is also accepted)"
+ *   description: GitHub handle to scan, e.g. octocat. A full profile URL works too.
  * - name: resume_path
  *   param_type: string
  *   required: true
- *   description: "Absolute path to a resume file, or to a folder of resumes (the newest wins)"
+ *   description: 'Absolute path to a resume file, or a folder of resumes (newest non-cover-letter wins). On Windows use the WSL form: /mnt/c/Users/<you>/Documents/resume.pdf - a C:\ path is translated automatically when it resolves.'
  * - name: role
  *   param_type: string
  *   required: false
- *   description: "Rank the gap for a track: backend, frontend, fullstack, ml, devops, mobile, data"
+ *   description: Rank the gap by fit for one track. Common job titles are accepted too, e.g. Software Developer resolves to fullstack.
  * - name: since
  *   param_type: string
  *   required: false
- *   description: "Override the baseline date as YYYY-MM-DD instead of using the resume file's timestamp"
+ *   description: Override the baseline as YYYY-MM-DD instead of the resume file timestamp. Pass an empty value to clear a previous override, which rote remembers between runs.
  * - name: include_forks
  *   param_type: string
  *   required: false
- *   description: "Set to true to include forked repositories (default false)"
+ *   description: Set to true to include forked repositories (default false)
  * steps:
  *   resolve_resume:
  *     type: process.exec
  *     timeout_ms: 20000
- *     argv: [python3, "@resource{resolve_resume.py}", $resume_path]
+ *     argv:
+ *     - python3
+ *     - '@resource{resolve_resume.py}'
+ *     - $resume_path
  *   fetch_repos:
  *     type: process.exec
  *     timeout_ms: 60000
- *     depends_on: [resolve_resume]
+ *     depends_on:
+ *     - resolve_resume
  *     argv:
  *     - python3
- *     - "@resource{fetch_repos.py}"
+ *     - '@resource{fetch_repos.py}'
  *     - $github_user
- *     - "@resolve_resume{.stdout.text}"
+ *     - '@resolve_resume{.stdout.text}'
  *     - $since
  *     - $include_forks
  *   match_mentions:
  *     type: process.exec
  *     timeout_ms: 45000
- *     depends_on: [resolve_resume, fetch_repos]
+ *     depends_on:
+ *     - resolve_resume
+ *     - fetch_repos
  *     argv:
  *     - python3
- *     - "@resource{match_mentions.py}"
- *     - "@resolve_resume{.stdout.text}"
- *     - "@fetch_repos{.stdout.text}"
+ *     - '@resource{match_mentions.py}'
+ *     - '@resolve_resume{.stdout.text}'
+ *     - '@fetch_repos{.stdout.text}'
  * ---
  *
  * Usage:
@@ -182,8 +188,65 @@ const ROLE_PROFILES: Record<string, string[]> = {
     "warehouse", "pipeline", "analytics", "tableau", "powerbi", "data"],
 };
 
-const roleKnown = roleParam !== "" && Object.hasOwn(ROLE_PROFILES, roleParam);
-const roleKeywords = roleKnown ? ROLE_PROFILES[roleParam] : [];
+// People type job titles, not track slugs. "Software Developer" is exactly what
+// someone reaches for, and silently falling back to no ranking punishes them for
+// answering in plain English. Resolve the common titles, and say in the report
+// which track a title resolved to rather than pretending they typed the slug.
+const ROLE_ALIASES: Record<string, string> = {
+  "software developer": "fullstack",
+  "software engineer": "fullstack",
+  "software development engineer": "fullstack",
+  "sde": "fullstack",
+  "swe": "fullstack",
+  "developer": "fullstack",
+  "engineer": "fullstack",
+  "programmer": "fullstack",
+  "full stack": "fullstack",
+  "full stack developer": "fullstack",
+  "full stack engineer": "fullstack",
+  "web developer": "frontend",
+  "frontend developer": "frontend",
+  "frontend engineer": "frontend",
+  "front end": "frontend",
+  "ui developer": "frontend",
+  "ui engineer": "frontend",
+  "backend developer": "backend",
+  "backend engineer": "backend",
+  "back end": "backend",
+  "server engineer": "backend",
+  "api engineer": "backend",
+  "ml engineer": "ml",
+  "machine learning engineer": "ml",
+  "machine learning": "ml",
+  "ai engineer": "ml",
+  "deep learning engineer": "ml",
+  "data scientist": "ml",
+  "research engineer": "ml",
+  "devops engineer": "devops",
+  "sre": "devops",
+  "site reliability engineer": "devops",
+  "platform engineer": "devops",
+  "cloud engineer": "devops",
+  "infrastructure engineer": "devops",
+  "mobile developer": "mobile",
+  "mobile engineer": "mobile",
+  "android developer": "mobile",
+  "ios developer": "mobile",
+  "flutter developer": "mobile",
+  "data engineer": "data",
+  "data analyst": "data",
+  "analytics engineer": "data",
+};
+
+const roleNormalised = roleParam.replace(/[^a-z0-9]+/g, " ").trim();
+const roleResolved = roleNormalised === ""
+  ? ""
+  : Object.hasOwn(ROLE_PROFILES, roleNormalised)
+    ? roleNormalised
+    : (ROLE_ALIASES[roleNormalised] ?? "");
+const roleKnown = roleResolved !== "";
+const roleAliased = roleKnown && roleResolved !== roleNormalised;
+const roleKeywords = roleKnown ? ROLE_PROFILES[roleResolved] : [];
 
 // ---------- baseline ----------
 
@@ -274,23 +337,32 @@ const liveUnlisted = missing.filter((s) => String(s.repo["homepage"] ?? "").trim
 
 // ---------- verdict ----------
 
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
 let verdict: string;
 if (!reposAvailable) {
-  verdict = "INCOMPLETE — GitHub could not be read";
+  verdict = "Cannot report — GitHub could not be read";
 } else if (shipped.length === 0) {
-  verdict = "IN SYNC — nothing pushed since the resume baseline";
+  verdict = "In sync — nothing pushed since your resume";
 } else if (!mentionsAvailable) {
-  verdict = `${shipped.length} repo(s) pushed since the baseline — mention state UNKNOWN`;
+  verdict = `${plural(shipped.length, "project")} pushed since — but your resume could not be read`;
 } else if (missing.length === 0) {
-  verdict = `IN SYNC — all ${shipped.length} repo(s) pushed since the baseline are already named`;
+  verdict = "In sync — everything you have pushed since is already on it";
 } else {
-  verdict = `${missing.length} project(s) missing from your resume`;
+  verdict = `${plural(missing.length, "project")} missing from your resume`;
 }
 
 // ---------- render ----------
+//
+// Shape of this report, deliberately: the answer first, the action second, the
+// caveats last. Someone re-running this every few weeks needs the number and the
+// list in the first five lines; the proxy-baseline and exclusion accounting still
+// matter, but they are reference material, not the headline. Nothing honest was
+// removed to get there - it moved below the rule.
 
 const lines: string[] = [];
 const pad = (s: string, n: number) => s.length > n ? s.slice(0, n - 1) + "…" : s.padEnd(n);
+const RULE = "─".repeat(64);
 
 // A step that died leaves a null body. Rendering the normal report over that
 // produces confident nonsense — "install pdftotext" when the real problem was a
@@ -299,193 +371,236 @@ const brokenSteps: string[] = [];
 if (resume === null) brokenSteps.push(`resolve_resume (${STEP_HANDLES.resolve_resume.outcome.status})`);
 if (reposData === null) brokenSteps.push(`fetch_repos (${STEP_HANDLES.fetch_repos.outcome.status})`);
 
+// A required parameter left blank fails in whichever step reads it first, which
+// can point at the wrong input entirely. Name the real gap up front.
+const missingRequired: string[] = [];
+if (!asParam("github_user")) missingRequired.push("github_user — your GitHub handle, e.g. octocat");
+if (!asParam("resume_path")) missingRequired.push("resume_path — path to your resume file or folder");
+
 const abortedReport = brokenSteps.length
   ? [
     "RESUME DRIFT",
     "",
-    "VERDICT  CANNOT REPORT — a required step did not complete",
+    "  ▸ Cannot report — a required step did not complete",
     "",
-    "FAILED",
+    ...(missingRequired.length
+      ? ["MISSING INPUT", ...missingRequired.map((m) => `  ${m}`), ""]
+      : []),
+    "WHAT FAILED",
     ...brokenSteps.map((s) => `  ${s}`),
     "",
-    "This play needs both a resume baseline and a repository list to say anything",
-    "truthful about drift. It reports nothing rather than guessing.",
+    "This play needs both a resume baseline and a repository list before it can say",
+    "anything truthful about drift, so it reports nothing rather than guessing.",
     "",
-    "The failing step printed the reason to stderr — see the step output above.",
-    "Most common causes: a mistyped github_user, or a resume_path that does not exist.",
+    "The failing step printed the reason above.",
+    "On Windows, use the WSL path form: /mnt/c/Users/<you>/Documents/resume.pdf",
   ].join("\n")
   : "";
 
+// ---------- headline ----------
+
+const translatedFrom = resume?.["translated_from_windows_path"];
+
 lines.push("RESUME DRIFT");
 lines.push("");
-lines.push(`VERDICT  ${verdict}`);
-lines.push("");
-
-lines.push("BASELINE");
+lines.push(`  ▸ ${verdict}`);
 if (resumeDate) {
-  lines.push(`  resume     ${String(chosen["name"] ?? "?")}`);
-  lines.push(`  dated      ${resumeDate}${baselineAge !== null ? `  (${baselineAge} days ago)` : ""}`);
+  lines.push(`    resume  ${String(chosen["name"] ?? "?")}`);
+  lines.push(`            ${baseline}${baselineAge !== null ? ` · ${baselineAge} days ago` : ""}`);
 }
-lines.push(`  comparing  everything pushed after ${baseline || "?"}`);
-lines.push(`  source     ${baselineSource}`);
-if (baselineSource.startsWith("since=")) {
-  // rote remembers a play's parameters between runs, so an override set once
-  // silently governs every later run. Say how to undo it rather than letting a
-  // stale cut-off quietly decide the answer.
-  lines.push("             ↳ an override is in effect and rote remembers parameters");
-  lines.push("               between runs. Pass an empty since= to return to the");
-  lines.push("               resume file's own date.");
-}
-if (!sinceValid && !baselineSource.startsWith("since=")) {
-  lines.push("             ↳ a file timestamp is a PROXY for when you last wrote the resume;");
-  lines.push("               cloud sync or a re-download resets it. Override with since=YYYY-MM-DD.");
-}
-if (sinceParam && !sinceValid) {
-  lines.push(`  ⚠ since="${sinceParam}" is not YYYY-MM-DD and was ignored.`);
-}
-const otherCandidates = (resume?.["candidates"] as Array<Record<string, unknown>> | undefined) ?? [];
-if (otherCandidates.length > 1) {
-  lines.push(`  considered ${otherCandidates.length} resume files; used the newest non-cover-letter`);
-}
+lines.push(
+  `    github  ${githubUser}` +
+  (reposAvailable ? ` · ${totalRead} repos read · ${shipped.length} pushed since` : ""),
+);
 lines.push("");
 
-lines.push("GITHUB");
-lines.push(`  account    ${githubUser}`);
 if (!reposAvailable) {
-  lines.push(`  ⚠ ${String(reposData?.["warning"] ?? "repositories unavailable")}`);
-} else {
-  lines.push(`  read       ${totalRead} repositories`);
-  lines.push(`  shipped    ${shipped.length} pushed after the baseline`);
-  if (reposData?.["truncated"] === true) {
-    lines.push(`  ⚠ ${String(reposData?.["warning"] ?? "result truncated")}`);
-  }
+  lines.push("GITHUB COULD NOT BE READ");
+  lines.push(`  ${String(reposData?.["warning"] ?? "repositories unavailable")}`);
+  lines.push("");
 }
-lines.push("");
 
-if (shipped.length) {
-  lines.push(roleKnown
-    ? `THE GAP  (ranked for ${roleParam}: keyword overlap, then recency)`
-    : "THE GAP  (ranked by recency — pass role= to rank by fit)");
-  lines.push(`  ${pad("status", 12)}${pad("pushed", 12)}${pad("repository", 26)}${pad("stack", 14)}live`);
-  for (const s of shipped) {
-    const status = s.mentioned === null
-      ? "UNKNOWN"
-      : s.mentioned === false
-        ? "MISSING"
-        : s.confidence === "weak" ? "weak-match" : "listed";
+// ---------- the gap ----------
+
+const listed = shipped.filter((s) => s.mentioned === true && s.confidence !== "weak");
+const headline = shipped.filter((s) => s.mentioned !== true);
+
+if (headline.length) {
+  const title = mentionsAvailable ? "MISSING FROM YOUR RESUME" : "PUSHED SINCE YOUR RESUME";
+  const rank = roleKnown
+    ? `ranked for ${roleResolved}`
+    : "newest first · pass role= to rank by fit";
+  lines.push(`${pad(title, 42)}${rank}`);
+  for (const s of headline) {
     const live = String(s.repo["homepage"] ?? "").trim();
     lines.push(
-      `  ${pad(status, 12)}${pad(String(s.repo["pushed_at"] ?? "?"), 12)}` +
-      `${pad(s.name, 26)}${pad(String(s.repo["language"] ?? "—"), 14)}${live || "—"}`,
+      `  ${pad(String(s.repo["pushed_at"] ?? "?"), 12)}${pad(s.name, 26)}` +
+      `${pad(String(s.repo["language"] ?? "—"), 13)}${live}`,
     );
-    if (roleKnown && s.matched.length) {
-      lines.push(`  ${" ".repeat(12)}↳ matched: ${s.matched.slice(0, 8).join(", ")}`);
-    }
+  }
+  if (!mentionsAvailable) {
+    lines.push("  ↳ shown as UNKNOWN, not missing: your resume could not be read (see below)");
   }
   lines.push("");
 }
 
-if (liveUnlisted.length) {
-  lines.push("LIVE BUT UNLISTED  (deployed, and the URL appears nowhere in the resume)");
-  for (const s of liveUnlisted) lines.push(`  ${pad(s.name, 26)}${s.repo["homepage"]}`);
+if (listed.length) {
+  lines.push("ALREADY ON YOUR RESUME");
+  lines.push(`  ${listed.map((s) => s.name).join(", ")}`);
   lines.push("");
 }
 
 if (weak.length) {
-  lines.push("WEAK MATCHES  (the name is also an ordinary word — verify these yourself)");
-  for (const s of weak) lines.push(`  ${pad(s.name, 26)}matched on ${s.evidence}`);
-  lines.push("");
-}
-
-if (!mentionsAvailable) {
-  lines.push("MENTION DETECTION  unavailable");
-  lines.push(`  ⚠ ${String(mentions?.["warning"] ?? "no extractor applied")}`);
-  lines.push("  Every repository above is UNKNOWN, not 'not mentioned' — this play could not look.");
-  lines.push("");
-} else {
-  lines.push(`MENTION DETECTION  ${String(mentions?.["method"] ?? "?")} — resume text was read locally and discarded`);
-  lines.push("");
-}
-
-if (roleParam && !roleKnown) {
-  lines.push(`⚠ role="${roleParam}" is not a known track; ranking fell back to recency.`);
-  lines.push(`  Known tracks: ${Object.keys(ROLE_PROFILES).join(", ")}`);
-  lines.push("");
-}
-
-const excluded = Object.entries(exclusions).filter(([, n]) => Number(n) > 0);
-if (excluded.length) {
-  lines.push("EXCLUDED  (counted, never silently dropped)");
-  for (const [reason, n] of excluded) lines.push(`  ${pad(String(n), 6)}${reason}`);
-  if (!includeForks && Number(exclusions["fork"] ?? 0) > 0) {
-    lines.push("         ↳ pass include_forks=true to include forks");
+  lines.push("WORTH CHECKING YOURSELF");
+  for (const s of weak) {
+    lines.push(`  ${pad(s.name, 26)}the name is an ordinary word, so the match may be coincidence`);
   }
   lines.push("");
 }
+
+// ---------- action ----------
 
 lines.push("NEXT");
 if (missing.length) {
-  lines.push(`  Add ${missing.length} project(s) above to your resume, newest first.`);
+  lines.push(`  Add ${missing.length} project${missing.length === 1 ? "" : "s"} above, newest first.`);
   if (liveUnlisted.length) {
     lines.push(liveUnlisted.length === 1
-      ? "  1 of them has a live URL worth linking."
-      : `  ${liveUnlisted.length} of them have a live URL worth linking.`);
+      ? `  ${liveUnlisted[0].name} is deployed and its URL is nowhere in the resume — worth linking.`
+      : `  ${liveUnlisted.length} are deployed with URLs nowhere in the resume — worth linking.`);
   }
-} else if (!mentionsAvailable) {
-  lines.push("  Install pdftotext, or export your resume to .docx/.md, to detect what is already named.");
-} else {
+} else if (!mentionsAvailable && shipped.length) {
+  lines.push("  Install pdftotext, or export your resume to .docx/.md, to see what is already named.");
+} else if (reposAvailable) {
   lines.push("  Nothing to add. Re-run after your next push.");
 }
+lines.push("");
+
+// ---------- details, below the rule ----------
+
+lines.push(RULE);
+lines.push("DETAILS");
+
+const excluded = Object.entries(exclusions).filter(([, n]) => Number(n) > 0);
+if (excluded.length) {
+  const total = excluded.reduce((sum, [, n]) => sum + Number(n), 0);
+  const parts = excluded
+    .sort((a, b) => Number(b[1]) - Number(a[1]))
+    .map(([reason, n]) => `${n} ${reason}`);
+  lines.push(`  excluded   ${total} repos — ${parts.join(", ")}`);
+  if (!includeForks && Number(exclusions["fork"] ?? 0) > 0) {
+    lines.push("             include_forks=true to count forks");
+  }
+}
+
+lines.push(`  baseline   ${baselineSource}`);
+if (baselineSource.startsWith("since=")) {
+  lines.push("             rote remembers parameters between runs — pass an empty since= to clear");
+} else {
+  lines.push("             a file timestamp is a proxy for when you last wrote it;");
+  lines.push("             cloud sync can reset it — override with since=YYYY-MM-DD");
+}
+if (sinceParam && !sinceValid) {
+  lines.push(`             since="${sinceParam}" is not YYYY-MM-DD and was ignored`);
+}
+
+const otherCandidates = (resume?.["candidates"] as Array<Record<string, unknown>> | undefined) ?? [];
+if (otherCandidates.length > 1) {
+  lines.push(`  resumes    ${otherCandidates.length} found in that folder; used the newest non-cover-letter`);
+  for (const c of otherCandidates.slice(1, 4)) {
+    lines.push(`             ${pad(String(c["mtime_iso"] ?? "?"), 12)}${String(c["name"] ?? "")}`);
+  }
+  if (otherCandidates.length > 4) {
+    lines.push(`             …and ${otherCandidates.length - 4} more`);
+  }
+  lines.push("             point resume_path at one file to compare against it instead");
+}
+
+lines.push(
+  `  mentions   ${mentionsAvailable
+    ? `${String(mentions?.["method"] ?? "?")} — resume read locally, then discarded`
+    : "unavailable"}`,
+);
+if (!mentionsAvailable) {
+  lines.push(`             ${String(mentions?.["warning"] ?? "no extractor applied")}`);
+}
+
+lines.push("  private    never counted — GitHub's public endpoint omits private repos");
+
+if (roleParam && !roleKnown) {
+  lines.push(`  role       "${roleParam}" is not a known track; ranked by recency instead`);
+  lines.push(`             try: ${Object.keys(ROLE_PROFILES).join(", ")}`);
+} else if (roleAliased) {
+  lines.push(`  role       "${roleParam}" → ${roleResolved}`);
+}
+
+if (typeof translatedFrom === "string" && translatedFrom) {
+  lines.push(`  path       Windows path translated to WSL: ${translatedFrom}`);
+}
+
+if (reposData?.["truncated"] === true) {
+  lines.push(`  limit      ${String(reposData?.["warning"] ?? "result truncated")}`);
+}
+
+// ---------- emit ----------
+
+const shortSummary = brokenSteps.length
+  ? "Resume drift: cannot report — a required step did not complete"
+  : `Resume drift: ${verdict}`;
 
 if (brokenSteps.length) {
   // Never render a normal-looking report over a broken read. The presentation
   // must not throw: a failing presentation discards its own output, and the
   // user is left with a stack trace instead of the reason.
   out.human(abortedReport);
-  out.summary("Resume drift: cannot report — a required step did not complete");
+  out.summary(shortSummary);
   out.result({
     run_id: ctx.run.run_id,
     verdict: "cannot_report",
     failed_steps: brokenSteps,
+    missing_required_parameters: missingRequired,
     reason: "A required step did not complete; no drift conclusion was produced.",
   });
 } else {
-out.human(lines.join("\n"));
-out.summary(verdict);
-out.result({
-  run_id: ctx.run.run_id,
-  verdict,
-  baseline: {
-    date: baseline,
-    source: baselineSource,
-    age_days: baselineAge,
-    resume_file: chosen["name"] ?? null,
-    is_proxy: !sinceValid,
-  },
-  github: {
-    user: githubUser,
-    available: reposAvailable,
-    read: totalRead,
-    shipped_since_baseline: shipped.length,
-    truncated: reposData?.["truncated"] ?? false,
-  },
-  mention_detection: {
-    available: mentionsAvailable,
-    method: mentions?.["method"] ?? null,
-    warning: mentions?.["warning"] ?? null,
-  },
-  role: { requested: roleParam || null, recognised: roleKnown },
-  missing: missing.map((s) => ({
-    name: s.name,
-    pushed_at: s.repo["pushed_at"],
-    language: s.repo["language"],
-    homepage: s.repo["homepage"] || null,
-    url: s.repo["html_url"],
-    role_match: s.matched,
-  })),
-  weak_matches: weak.map((s) => ({ name: s.name, evidence: s.evidence })),
-  unknown_mention: unknown.map((s) => s.name),
-  live_but_unlisted: liveUnlisted.map((s) => ({ name: s.name, homepage: s.repo["homepage"] })),
-  exclusions,
-});
+  out.human(lines.join("\n"));
+  out.summary(shortSummary);
+  out.result({
+    run_id: ctx.run.run_id,
+    verdict,
+    baseline: {
+      date: baseline,
+      source: baselineSource,
+      age_days: baselineAge,
+      resume_file: chosen["name"] ?? null,
+      is_proxy: !sinceValid,
+      translated_from_windows_path: translatedFrom ?? null,
+      candidates_considered: otherCandidates.length,
+    },
+    github: {
+      user: githubUser,
+      available: reposAvailable,
+      read: totalRead,
+      shipped_since_baseline: shipped.length,
+      truncated: reposData?.["truncated"] ?? false,
+      private_repos_included: false,
+    },
+    mention_detection: {
+      available: mentionsAvailable,
+      method: mentions?.["method"] ?? null,
+      warning: mentions?.["warning"] ?? null,
+    },
+    role: { requested: roleParam || null, resolved: roleResolved || null, recognised: roleKnown },
+    missing: missing.map((s) => ({
+      name: s.name,
+      pushed_at: s.repo["pushed_at"],
+      language: s.repo["language"],
+      homepage: s.repo["homepage"] || null,
+      url: s.repo["html_url"],
+      role_match: s.matched,
+    })),
+    already_listed: listed.map((s) => s.name),
+    weak_matches: weak.map((s) => ({ name: s.name, evidence: s.evidence })),
+    unknown_mention: unknown.map((s) => s.name),
+    live_but_unlisted: liveUnlisted.map((s) => ({ name: s.name, homepage: s.repo["homepage"] })),
+    exclusions,
+  });
 }

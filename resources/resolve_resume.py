@@ -11,6 +11,7 @@ file: the play cannot answer its question without a baseline date.
 
 import json
 import os
+import re
 import sys
 import time
 
@@ -20,9 +21,30 @@ RESUME_EXTS = {".pdf", ".docx", ".doc", ".md", ".txt", ".rtf", ".odt", ".tex", "
 NOISE_TOKENS = ("cover", "letter", "reference", "transcript", "certificate")
 
 
+WINDOWS_PATH_RE = re.compile(r"^([A-Za-z]):[\\/](.*)$", re.S)
+
+
 def die(message):
     sys.stderr.write(message.rstrip() + "\n")
     sys.exit(1)
+
+
+def windows_to_wsl(raw):
+    """Translate a Windows path to its WSL mount point.
+
+    C:\\Users\\me\\resume.pdf  ->  /mnt/c/Users/me/resume.pdf
+
+    Rote's supported platforms include "Windows via WSL", so the play runs
+    inside Linux while the user lives in Windows and copies Windows paths out
+    of Explorer. Refusing those is technically correct and practically useless:
+    the path is right, the mount prefix is missing. Returns None when the input
+    is not a Windows-style path.
+    """
+    match = WINDOWS_PATH_RE.match(raw.strip().strip('"'))
+    if not match:
+        return None
+    drive, rest = match.group(1).lower(), match.group(2)
+    return "/mnt/%s/%s" % (drive, rest.replace("\\", "/"))
 
 
 def describe(path):
@@ -50,13 +72,29 @@ def main():
             "Pass an absolute path, e.g. resume_path=/home/you/Documents/resume.pdf"
         )
 
-    path = os.path.expanduser(raw)
+    path = os.path.expanduser(raw.strip().strip('"'))
+    translated_from = None
 
     if not os.path.exists(path):
-        die(
-            "resolve_resume: no such path: %s\n"
-            "Pass an absolute path to a resume file, or to a folder containing one." % path
-        )
+        alt = windows_to_wsl(raw)
+        if alt and os.path.exists(alt):
+            translated_from, path = path, alt
+        elif alt:
+            die(
+                "resolve_resume: no such path: %s\n"
+                "That looks like a Windows path. This play runs inside WSL, where your "
+                "C: drive is mounted at /mnt/c, so the equivalent path is:\n"
+                "    %s\n"
+                "That does not exist either. Check the folder name, and note that WSL "
+                "paths are case-sensitive where Windows is not." % (raw, alt)
+            )
+        else:
+            die(
+                "resolve_resume: no such path: %s\n"
+                "Pass an absolute path to a resume file, or to a folder containing one.\n"
+                "On Windows/WSL, use the /mnt form: /mnt/c/Users/<you>/Documents/resume.pdf"
+                % path
+            )
 
     skipped_dirs = []
     if os.path.isdir(path):
@@ -97,6 +135,9 @@ def main():
         "source": source,
         "today_iso": time.strftime("%Y-%m-%d", time.localtime()),
         "input_path": os.path.abspath(path),
+        # Stated, never silent: a path the play rewrote is a path the user did
+        # not choose, and they should see that it happened.
+        "translated_from_windows_path": translated_from,
         "chosen": chosen,
         "candidate_count": len(candidates),
         "candidates": [

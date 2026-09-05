@@ -52,6 +52,11 @@ being confidently wrong. So the uncomfortable parts are stated rather than hidde
 - **"Could not look" is not "did not find."** Mention detection needs to read the resume.
   PDFs need `pdftotext`; without it every repository comes back **UNKNOWN**, never
   "missing". A tool that reports absence it never checked for is worse than one that admits it.
+- **An extractor that succeeds on nothing counts as a failure.** `pdftotext` exits cleanly
+  on a scanned or image-only PDF and hands back a page of form feeds. Empty text matches no
+  project name, so a naive reading would call *everything* missing while printing that it
+  had read your resume. If fewer than 100 alphanumeric characters come back, the run reports
+  **UNKNOWN** and tells you the file looks image-only.
 - **Ambiguous names are flagged, not asserted.** A repo called `Studio`, `Portfolio` or
   `Core` can match an ordinary sentence in your resume. Those come back as `weak-match`
   for you to verify, not as facts.
@@ -69,16 +74,20 @@ report, the JSON result, or anywhere on disk.
 
 The only network call is one unauthenticated request to the public GitHub API.
 `GITHUB_TOKEN` is honoured *if already present* in your environment, purely to raise the
-rate limit and include private repositories — it is never required, never requested, and
-never printed.
+rate limit — it is never required, never requested, and never printed.
+
+**Private repositories are never counted.** `GET /users/{username}/repos` returns public
+repositories only, with or without a token, so a private project will not appear in the
+gap even if it is the newest thing you shipped. The report states this on every run rather
+than letting you infer that your private work was checked.
 
 ## Parameters
 
 | name | required | description |
 |---|---|---|
 | `github_user` | yes | GitHub handle to scan. A full profile URL also works. |
-| `resume_path` | yes | Absolute path to a resume file, **or** a folder of resumes (newest non-cover-letter wins). |
-| `role` | no | Rank the gap by fit: `backend`, `frontend`, `fullstack`, `ml`, `devops`, `mobile`, `data`. |
+| `resume_path` | yes | Absolute path to a resume file, **or** a folder of resumes (newest non-cover-letter wins). On Windows, a `C:\...` path is translated to its `/mnt/c/...` WSL form automatically. |
+| `role` | no | Rank the gap by fit. Tracks: `fullstack`, `backend`, `frontend`, `ml`, `devops`, `mobile`, `data`. Job titles work too and are case-insensitive — `Software Developer`, `SRE`, `Data Scientist`. Anything unrecognised falls back to newest-first and says so. |
 | `since` | no | Override the baseline as `YYYY-MM-DD`. Pass an empty `since=` to clear a previous override. |
 | `include_forks` | no | `true` to include forked repositories. |
 
@@ -101,6 +110,14 @@ repository as `UNKNOWN` rather than guessing.
 - `pdftotext`, optional, only for PDF mention detection
 
 Read-only. Writes nothing, anywhere. No credentials.
+
+## Windows
+
+Rote runs under WSL, so paths inside it are Linux paths. You can still paste a Windows path
+straight out of Explorer — `C:\Users\you\Documents\Resumes` is translated to
+`/mnt/c/Users/you/Documents/Resumes` when that resolves, and the run tells you it did so.
+If it does not resolve, the error prints the exact `/mnt/...` path it tried, because WSL
+paths are case-sensitive where Windows is not.
 
 ## Known limitation
 

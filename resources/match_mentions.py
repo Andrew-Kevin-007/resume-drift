@@ -104,6 +104,25 @@ def main():
     if path and os.path.exists(path):
         text, method = read_text(path, ext)
 
+    # An extractor can succeed and still recover nothing usable. pdftotext exits
+    # 0 on a scanned or image-only PDF and writes a file of form feeds; a .docx
+    # whose prose lives outside word/document.xml unzips to markup with no
+    # words. Empty text matches no repository name, so every repository would be
+    # reported "mentioned: false" - a confident wrong answer about a document
+    # that was never actually read, printed under a line claiming it was. Treat
+    # it as could-not-look, which is the honest answer.
+    MIN_ALNUM = 100
+    alnum = sum(1 for c in (text or "") if c.isalnum())
+    if text is not None and alnum < MIN_ALNUM:
+        method = (
+            "%s ran but recovered only %d alphanumeric characters (a readable "
+            "resume has far more than %d). This file is almost certainly "
+            "image-only or scanned, so its text was never read. Run OCR on it, "
+            "or export a text-based copy (.docx/.md), then re-run."
+            % (method, alnum, MIN_ALNUM)
+        )
+        text = None
+
     if text is None:
         # Could not look. Say so; do not answer "not mentioned".
         print(json.dumps({

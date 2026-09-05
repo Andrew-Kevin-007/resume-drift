@@ -10,8 +10,15 @@ which is a confident wrong answer. So this step emits aggregate counts plus a
 bounded candidate list, and every bound it applies is reported.
 
 No credentials required. GITHUB_TOKEN is honoured when present purely to raise
-the rate limit and include private repositories; it is never required and
-never printed.
+the rate limit; it is never required and never printed.
+
+It does NOT surface private repositories, and the report says so. This endpoint
+- GET /users/{username}/repos - returns public repositories only, whatever
+token accompanies it; private repositories live behind GET /user/repos, the
+authenticated-user endpoint, which would answer for the token's owner rather
+than for the requested handle. Claiming otherwise would tell someone their
+private work had been counted when it never was, and answer "IN SYNC" to a
+person whose unlisted projects are all private.
 
 Fatal (nonzero exit) only when the account does not exist. Rate limits and
 network failures are expected optional degradations: available=false with a
@@ -187,8 +194,11 @@ def main():
         "truncated": page_truncated or candidate_truncated,
         "warning": " ".join(warnings) or None,
         "visibility_note": (
-            "Public repositories only; set GITHUB_TOKEN to include private ones."
-            if not token else "GITHUB_TOKEN present: private repositories included."
+            "Public repositories only. This endpoint never returns private "
+            "repositories, with or without a token, so private work is not "
+            "counted in this report."
+            + (" GITHUB_TOKEN is present and raises the rate limit only."
+               if token else " Set GITHUB_TOKEN to raise the rate limit.")
         ),
     }))
 
