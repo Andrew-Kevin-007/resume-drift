@@ -1,0 +1,35 @@
+schema_version = 1
+
+[[tools]]
+id = "python3"
+command = "python3"
+required = true
+
+[[tools.install]]
+manager = "brew"
+package = "python@3"
+
+[[tools.install]]
+manager = "apt"
+package = "python3"
+
+[[tools.install]]
+manager = "system"
+notes = "Any Python 3.8+ on PATH. Every step is a stdlib-only script; nothing is pip-installed."
+
+[[tools]]
+id = "pdftotext"
+command = "pdftotext"
+required = false
+
+[[tools.install]]
+manager = "brew"
+package = "poppler"
+
+[[tools.install]]
+manager = "apt"
+package = "poppler-utils"
+
+[[tools.install]]
+manager = "system"
+notes = "Optional. Without it, PDF resumes still set the baseline date, but mention detection reports UNKNOWN instead of guessing. Not needed for .docx, .odt, .md or .txt resumes."
