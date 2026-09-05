@@ -82,6 +82,24 @@ class Gh:
         self.rate_limited = False
         self.exhausted = False
 
+
+    def remaining(self):
+        """Ask GitHub how much quota is left. This call is free: the rate limit
+        endpoint is explicitly not counted against the rate limit."""
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "rote-play-project-shortlist",
+        }
+        if self.token:
+            headers["Authorization"] = "Bearer " + self.token
+        try:
+            req = urllib.request.Request(API + "/rate_limit", headers=headers)
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                core = json.loads(resp.read().decode("utf-8"))["resources"]["core"]
+            return int(core.get("remaining", -1)), int(core.get("reset", 0))
+        except Exception:  # noqa: BLE001 - preflight is advisory, never fatal
+            return -1, 0
+
     def get(self, path):
         if self.calls >= self.budget:
             self.exhausted = True
@@ -474,6 +492,26 @@ def main():
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or ""
     gh = Gh(token, budget)
 
+    # Look before spending. A run that discovers halfway through that it never
+    # had the quota has already burned what was left and half-built a report.
+    quota, reset_epoch = gh.remaining()
+    reset_in_min = None
+    if quota >= 0:
+        import time as _time
+        reset_in_min = max(0, int((reset_epoch - _time.time()) / 60))
+        if quota < 3:
+            degrade(
+                "GitHub quota is already spent (%d of 60 left, resets in about %d "
+                "minutes). Nothing was requested, so nothing was wasted. Wait, or "
+                "set GITHUB_TOKEN in your environment to raise the limit to 5000."
+                % (quota, reset_in_min),
+                user=user, quota_remaining=quota, quota_resets_in_minutes=reset_in_min)
+        # Leave two calls of headroom so the run ends on a complete report
+        # rather than a truncated one.
+        if quota - 2 < budget:
+            budget = max(3, quota - 2)
+            gh.budget = budget
+
     raw = []
     for page in range(1, MAX_PAGES + 1):
         batch = gh.get("/users/%s/repos?per_page=%d&page=%d&sort=pushed&type=owner"
@@ -605,6 +643,9 @@ def main():
         "authenticated": bool(token),
         "api_calls": gh.calls,
         "api_budget": gh.budget,
+        "quota_remaining_before": quota,
+        "quota_resets_in_minutes": reset_in_min,
+        "budget_capped_by_quota": quota >= 0 and quota - 2 <= budget,
         "budget_exhausted": gh.exhausted,
         "rate_limited": gh.rate_limited,
         "total_repos": len(raw),

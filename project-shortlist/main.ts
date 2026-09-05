@@ -23,7 +23,7 @@
  *   - resume
  * metadata:
  *   rote_version: 0.78.0
- *   version: 0.1.2
+ *   version: 0.1.3
  *   status: released
  *   kind: atomic
  *   flow_type: parallel
@@ -619,7 +619,20 @@ if (brokenSteps.length) {
   lines.push("  a one-day scaffold or a missing README caps a project below SOLID");
   lines.push("");
   lines.push("DETAILS");
-  lines.push(`  api calls  ${String(scan?.["api_calls"] ?? "?")} of ${String(scan?.["api_budget"] ?? "?")} budgeted (GitHub allows 60/hour unauthenticated)`);
+  lines.push(`  api calls  ${String(scan?.["api_calls"] ?? "?")} of ${String(scan?.["api_budget"] ?? "?")} budgeted`);
+  const quotaLeft = Number(scan?.["quota_remaining_before"] ?? -1);
+  if (quotaLeft >= 0) {
+    lines.push(
+      `  quota      ${quotaLeft} GitHub calls were available` +
+      (scan?.["quota_resets_in_minutes"] != null
+        ? `, resetting in about ${String(scan["quota_resets_in_minutes"])} min`
+        : ""),
+    );
+    if (scan?.["budget_capped_by_quota"] === true) {
+      lines.push("             this run was cut to fit that, which is why some projects");
+      lines.push("             were not examined. Set GITHUB_TOKEN to raise the limit to 5000.");
+    }
+  }
   const exclusions = (scan?.["exclusions"] as Record<string, number> | undefined) ?? {};
   const ex = Object.entries(exclusions).filter(([, n]) => Number(n) > 0);
   if (ex.length) lines.push(`  excluded   ${ex.map(([k, v]) => `${v} ${k}`).join(", ")}`);
