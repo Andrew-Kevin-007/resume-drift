@@ -23,7 +23,7 @@
  *   - resume
  * metadata:
  *   rote_version: 0.78.0
- *   version: 0.1.6
+ *   version: 0.1.7
  *   status: released
  *   kind: atomic
  *   flow_type: parallel
@@ -369,7 +369,7 @@ if (!reposAvailable) {
 
 const lines: string[] = [];
 const pad = (s: string, n: number) => s.length > n ? s.slice(0, n - 1) + "…" : s.padEnd(n);
-const RULE = "─".repeat(64);
+const RULE = "─".repeat(70);
 
 // A step that died leaves a null body. Rendering the normal report over that
 // produces confident nonsense — "install pdftotext" when the real problem was a

@@ -19,7 +19,7 @@
  *   - onboarding
  * metadata:
  *   rote_version: 0.78.0
- *   version: 0.1.1
+ *   version: 0.1.2
  *   status: released
  *   kind: atomic
  *   flow_type: parallel
@@ -113,7 +113,7 @@ const asParam = (key: string): string => {
 const demoMode = ["true", "1", "yes"].includes(asParam("demo").toLowerCase());
 
 const lines: string[] = [];
-const RULE = "─".repeat(60);
+const RULE = "─".repeat(70);
 
 // ---------------------------------------------------------------- failure path
 
@@ -179,7 +179,8 @@ lines.push("CLONE READY");
 lines.push("");
 if (demoMode) {
   lines.push("  DEMO RUN. A bundled fixture repo ships with this play, so this shows the");
-  lines.push("  shape of the answer with no setup. Point it at a real clone with root=");
+  lines.push("  shape of the answer without any setup. For your own answer:");
+  lines.push("  root=<path to a cloned repo>");
   lines.push("");
 }
 lines.push(`  ▸ ${projectName} · ${summary}`);
