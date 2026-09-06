@@ -475,3 +475,35 @@ scores high enough" rendering, no crashes.
 **Cosmetic consistency**, cheap and previously unnoticed: three plays had picked three
 different DETAILS rule-line widths (60, 64, 70 characters) with no functional reason,
 and clone-ready's demo banner read slightly differently from the other two. Standardised.
+
+**Go got a run command, but only with real evidence.** clone-ready suggested `cargo run`
+for Rust but nothing for Go, an inconsistency found while building a real Go fixture. The
+naive fix (`go run .` unconditionally) would have repeated the exact mistake being fixed
+everywhere else today: a large share of real Go repositories are libraries with no main
+package, and `go run .` fails outright on those. Added a real check - a top-level .go file
+whose contents start with `package main` - before ever suggesting it.
+
+**The most valuable finding of the day came from testing the PUBLISHED plays, not local
+files.** A live-URI verification sweep - `rote play run https://play.modiqo.ai/... demo=true`,
+exactly the command in every README - crashed clone-ready outright: "no such directory:
+/tmp/pnpm-mono", a root= value left sticky from a synthetic fixture built several
+iterations earlier and long since gone. The bug: `if demo_flag and not raw` only used the
+bundled fixture when root happened to be empty, so a stale non-empty root silently beat
+demo=true instead of the other way around. resume-drift and project-shortlist's own
+resume_path handling already had this right (demo wins unconditionally); clone-ready did
+not.
+
+Auditing for the same shape elsewhere found it again, in both remaining plays: github_user
+had the identical bug in resume-drift's fetch_repos.py and project-shortlist's
+scan_and_score.py. Reproduced concretely - set github_user=octocat, then run demo=true
+alone - and both plays silently kept running against octocat instead of the documented
+demo account. Not a crash this time, which is precisely what made it easy to miss: a
+demo that quietly shows the wrong account still looks like it worked. Fixed identically in
+all three places; grepped all three plays for any remaining instance of the pattern and
+found none.
+
+**Lesson worth keeping**: testing against a play's own public URI, with only the exact
+parameters a README documents, catches a category of bug that testing local files with
+every parameter explicitly set cannot - because explicitly setting every parameter on
+every test run is exactly what prevents platform's parameter-memory quirk from ever
+mattering during testing.
