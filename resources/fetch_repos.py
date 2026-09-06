@@ -124,6 +124,14 @@ def main():
             if exc.code in (403, 429):
                 degrade("GitHub rate limit reached for this IP (60 requests/hour "
                         "unauthenticated). Wait, or set GITHUB_TOKEN to raise it.", user=user)
+            if exc.code == 401:
+                degrade(
+                    "GitHub rejected the request as unauthorized (HTTP 401). "
+                    "This almost always means GITHUB_TOKEN is set in your environment "
+                    "but is invalid, expired, or revoked - not that github_user is wrong. "
+                    "Unset it to fall back to unauthenticated access, or replace it.",
+                    user=user,
+                )
             degrade("GitHub API returned HTTP %d." % exc.code, user=user)
         except urllib.error.URLError as exc:
             degrade("GitHub API unreachable: %s" % str(exc.reason)[:80], user=user)

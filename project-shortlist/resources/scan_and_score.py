@@ -81,6 +81,7 @@ class Gh:
         self.calls = 0
         self.rate_limited = False
         self.exhausted = False
+        self.unauthorized = False
 
 
     def remaining(self):
@@ -119,6 +120,8 @@ class Gh:
         except urllib.error.HTTPError as exc:
             if exc.code in (403, 429):
                 self.rate_limited = True
+            if exc.code == 401:
+                self.unauthorized = True
             if exc.code == 404:
                 return None
             return None
@@ -517,6 +520,14 @@ def main():
         batch = gh.get("/users/%s/repos?per_page=%d&page=%d&sort=pushed&type=owner"
                        % (urllib.parse.quote(user), PER_PAGE, page))
         if batch is None:
+            if gh.unauthorized:
+                degrade(
+                    "GitHub rejected the request as unauthorized (HTTP 401). This "
+                    "almost always means GITHUB_TOKEN is set in your environment but "
+                    "is invalid, expired, or revoked - not that github_user is wrong. "
+                    "Unset it to fall back to unauthenticated access, or replace it.",
+                    user=user,
+                )
             if gh.rate_limited:
                 degrade("GitHub rate limit reached (60 requests/hour unauthenticated). "
                         "Wait an hour, or set GITHUB_TOKEN to raise it to 5000.", user=user)
