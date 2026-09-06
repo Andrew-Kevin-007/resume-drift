@@ -205,6 +205,23 @@ def detect_workspace_members(root, pkg):
     return members, source
 
 
+def _has_go_main(root):
+    """Real evidence of a runnable Go program at this level: a top-level .go
+    file that actually declares `package main`. Checked shallow and bounded -
+    this only needs to answer yes/no for the module root, not walk the tree."""
+    try:
+        entries = os.listdir(root)
+    except OSError:
+        return False
+    for name in entries:
+        if not name.endswith(".go"):
+            continue
+        text = read_text(os.path.join(root, name), limit=2000)
+        if text and re.match(r"^\s*package\s+main\b", text, re.M):
+            return True
+    return False
+
+
 def detect_node(root, pkg):
     """Which package manager, and whether more than one lockfile disagrees.
 
@@ -541,7 +558,19 @@ def main():
             ("Gemfile", "ruby", "bundle install"),
         ):
             if os.path.exists(os.path.join(scan_root, manifest)):
-                run_cmd = "cargo run" if kind == "rust" else None
+                if kind == "rust":
+                    # Cargo.toml always names a package; `cargo run` is a safe
+                    # default even for a workspace (it prompts if ambiguous).
+                    run_cmd = "cargo run"
+                elif kind == "go":
+                    # go.mod existing does not mean this module is runnable - a
+                    # huge fraction of real Go repositories are libraries with
+                    # no main package at all, and `go run .` fails outright on
+                    # those. Only suggest it with actual evidence: a file at
+                    # this level literally declaring `package main`.
+                    run_cmd = "go run ." if _has_go_main(scan_root) else None
+                else:
+                    run_cmd = None
                 found.append({
                     "kind": kind, "location": location, "manifest": manifest,
                     "install_cmd": install_cmd, "run_cmd": run_cmd,
