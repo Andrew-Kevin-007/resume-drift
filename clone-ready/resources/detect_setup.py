@@ -372,7 +372,13 @@ def detect_env(root):
         "declared_vars": sorted(declared),
         "local_files_present": local_files,
         "already_configured": already_configured,
+        # The true count and the shown sample are reported separately. Slicing
+        # first and reporting len() of the slice would silently cap the count
+        # itself - "15 vars missing" reading as complete when it is a sample
+        # of a much larger number is exactly the failure this play exists to
+        # catch in OTHER people's projects; it must not commit it here.
         "used_in_source_but_undeclared": undeclared[:15],
+        "used_in_source_but_undeclared_total": len(undeclared),
         "source_scan_truncated": truncated,
     }
 

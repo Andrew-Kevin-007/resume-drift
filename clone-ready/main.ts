@@ -19,7 +19,7 @@
  *   - onboarding
  * metadata:
  *   rote_version: 0.78.0
- *   version: 0.1.2
+ *   version: 0.1.3
  *   status: released
  *   kind: atomic
  *   flow_type: parallel
@@ -283,10 +283,17 @@ for (const e of ecosystems) {
   if (e["conflict"]) bites.push(String(e["conflict"]));
 }
 const undeclared = (env["used_in_source_but_undeclared"] as string[] | undefined) ?? [];
-if (undeclared.length) {
+// The true count, not the length of whatever sample was kept for display -
+// slicing first and reporting the slice's length would silently understate
+// how many are actually missing.
+const undeclaredTotal = Number(env["used_in_source_but_undeclared_total"] ?? undeclared.length);
+if (undeclaredTotal) {
+  const shown = undeclared.slice(0, 12);
+  const more = undeclaredTotal - shown.length;
   bites.push(
-    `${undeclared.length} env var${undeclared.length === 1 ? "" : "s"} read in the code but missing ` +
-    `from ${String(env["example_file"] ?? "the example file")}: ${undeclared.join(", ")}. ` +
+    `${undeclaredTotal} env var${undeclaredTotal === 1 ? "" : "s"} read in the code but missing ` +
+    `from ${String(env["example_file"] ?? "the example file")}: ${shown.join(", ")}` +
+    `${more > 0 ? `, and ${more} more` : ""}. ` +
     `This is the kind of thing that only shows up once the app is already running.`,
   );
 }
@@ -337,6 +344,10 @@ if (ecosystems.length) {
   );
 }
 lines.push("  method     filesystem reads only — no network call, no install run, nothing written");
+if (env["source_scan_truncated"] === true) {
+  lines.push("  note       this repository has more source files than one scan checks;");
+  lines.push("             the env var list above may be incomplete, not exhaustive");
+}
 
 const verdict = ecosystems.length
   ? `${summary} — run the commands above`
