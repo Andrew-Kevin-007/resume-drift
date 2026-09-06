@@ -133,8 +133,15 @@ repositories would exhaust that in a single run. So:
 - evidence calls (README plus recursive file tree, two per repository) are spent only on
   the strongest candidates
 - `evidence_budget` bounds the spend, defaults to 24, and what went unexamined is named
+- the remaining quota is checked *before* spending it (GitHub's `/rate_limit` endpoint
+  does not itself count against the limit), so a run that cannot afford its budget says so
+  and requests nothing, rather than spending down to zero mid-run and reporting a half
+  answer as if it were complete
 - on a rate limit it degrades with a labelled warning rather than reporting an empty result
   as a clean one
+- a project whose evidence could not be read (rate-limited mid-scan) is reported as
+  **not examined**, never folded into a verdict — a blocked read is not the same claim as
+  "this project has no README"
 
 `GITHUB_TOKEN` is honoured if present and raises the limit to 5000. It is never required.
 Private repositories are never counted: the public endpoint does not return them, with or

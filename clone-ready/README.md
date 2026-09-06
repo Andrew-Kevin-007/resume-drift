@@ -65,6 +65,13 @@ this whole toolkit.
   Dockerfiles (a `backend/` and a `frontend/`, say), a root-only scan finds
   nothing to install. This follows each build context and reports each
   service's own install and run commands separately, in order.
+- **pnpm/npm/yarn workspaces.** A workspace installs once at the root — that
+  is the entire point of one lockfile and hoisted dependencies — so a
+  root-only scan finds an install command and then nothing to run. Reads
+  `pnpm-workspace.yaml` or a `package.json` `workspaces` field, resolves each
+  member package, and lists each one's own run command in that manager's real
+  syntax (`pnpm --filter <name> dev`, `yarn workspace <name> dev`,
+  `npm run dev --workspace=<name>`).
 - **Declared services**, Postgres/MySQL/Redis/MongoDB/RabbitMQ/Elasticsearch/
   Kafka, read from `docker-compose.yml`, so "why can't it connect" is answered
   before it happens.
@@ -76,6 +83,12 @@ choice states which signal decided it. A project with no manifest is reported
 as having no manifest, not silently skipped or guessed at. A folder full of
 unrelated files (someone pointing `root=` at the wrong path) is recognised
 quickly rather than walked file by file until a timeout.
+
+A displayed list is never confused with its own count. On a repository with
+thousands of undeclared env vars, the report says "4000 env vars ... and 3988
+more" rather than silently capping the sample and reporting *that* length as
+if it were the total — the exact class of confidently-wrong answer this play
+exists to catch in other people's projects.
 
 ## Privacy and effects
 
