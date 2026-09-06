@@ -424,3 +424,54 @@ running from its public URI. Real test sweep covered seven actual cloned reposit
 already on disk (Next.js single-lockfile, dual-lockfile conflict, Rust with Cargo.toml,
 Python with no manifest at all, a nested project root one folder down, and the
 Attendancetracker monorepo) plus both failure paths (missing directory, no parameters).
+
+---
+
+## 11. Post-submission testing loop (production-readiness pass)
+
+With all three plays published, ran a continuous, self-paced testing loop rather than
+stopping - functionality, performance, and UI/UX, aimed at production readiness rather
+than just "clears the judging bar."
+
+**pnpm/npm/yarn workspaces (clone-ready).** A synthetic monorepo test (not backed by
+docker-compose, the shape already handled) showed the play reporting "pnpm install" and
+then nothing runnable - Turborepo/Nx/pnpm-workspace projects are at least as common as the
+docker-compose monorepo case. Fixed by parsing `pnpm-workspace.yaml` or a `package.json`
+`workspaces` field and listing each member's run command in that manager's real syntax
+(`pnpm --filter`, `yarn workspace`, `npm run --workspace=`).
+
+**A second instance of the "truncated sample reported as the total" bug.** A performance
+stress test (6000 real source files, deliberately built past the scanner's own cap) found
+clone-ready's env-var list sliced to 15 entries *before* its length was reported, so the
+headline always read "15 env vars missing" regardless of the true count (4000, in this
+test). Fixed by reporting the true total separately from the displayed sample. Also
+surfaced that the scanner's own truncation flag was computed but never shown - added a
+DETAILS note.
+
+**Invalid GITHUB_TOKEN (HTTP 401).** Tested with a deliberately bad token. resume-drift
+gave only a bare HTTP code; project-shortlist was worse, since a 401 was not distinguished
+from "the account listing failed" and fell through to "check the handle," which is
+actively wrong - the handle was fine, the token was not. Both now name the real, common
+cause and the fix (unset or replace the token) directly.
+
+**Every documented resume format, tested end to end** (.doc, .rtf, .pages, a corrupted
+.docx) surfaced a message-accuracy bug shared by both plays: the "too few characters
+recovered" warning was hardcoded to scanned-PDF/OCR language regardless of which extractor
+actually ran, which is nonsensical advice for a short .rtf or .txt file. Fixed to branch on
+the actual extractor. Also confirmed, and recorded rather than fixed given the time budget:
+.rtf has no real parser and is read as raw plaintext, so genuine RTF control-word markup
+becomes part of the matched text - verified this does not break real matches (project
+names in real RTF prose were still found correctly), with the residual risk being a
+low-probability false positive against a repository coincidentally named after an RTF
+control word.
+
+**Cross-play audits that found nothing** (worth recording as evidence the earlier fixes
+generalised, not just a clean bill of health): systematically grepped both other plays for
+the same "slice before counting" pattern that caused the clone-ready bug above - both
+already computed truncation flags before slicing and disclosed samples honestly. Tested
+both plays against a real low-repo-count account (octocat) - clean "in sync" / "nothing
+scores high enough" rendering, no crashes.
+
+**Cosmetic consistency**, cheap and previously unnoticed: three plays had picked three
+different DETAILS rule-line widths (60, 64, 70 characters) with no functional reason,
+and clone-ready's demo banner read slightly differently from the other two. Standardised.
