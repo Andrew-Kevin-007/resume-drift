@@ -23,7 +23,7 @@
  *   - resume
  * metadata:
  *   rote_version: 0.78.0
- *   version: 0.1.10
+ *   version: 0.1.11
  *   status: released
  *   kind: atomic
  *   flow_type: parallel
@@ -260,7 +260,18 @@ const roleKeywords = roleKnown ? ROLE_PROFILES[roleResolved] : [];
 const chosen = (resume?.["chosen"] as Record<string, unknown> | undefined) ?? {};
 const resumeDate = String(chosen["mtime_iso"] ?? "");
 const todayIso = String(resume?.["today_iso"] ?? "");
-const sinceValid = /^\d{4}-\d{2}-\d{2}$/.test(sinceParam);
+// Shape alone is not enough: 2026-13-45 matches \d{4}-\d{2}-\d{2} but is not a
+// real date. new Date() silently normalises an invalid date (month 13 rolls
+// into next January) rather than rejecting it, so validity is checked by
+// round-tripping through UTC and confirming nothing rolled over.
+function isRealDate(value: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return false;
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d;
+}
+const sinceValid = isRealDate(sinceParam);
 // fetch_repos resolved the baseline it actually filtered on; trust that over
 // re-deriving it here, so the report can never describe a different cut-off
 // than the one the data was selected with.

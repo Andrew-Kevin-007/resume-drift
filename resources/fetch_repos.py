@@ -25,6 +25,7 @@ network failures are expected optional degradations: available=false with a
 warning, exit 0, so the run still says plainly what it could not read.
 """
 
+import datetime
 import json
 import os
 import re
@@ -74,9 +75,24 @@ def request(url, token):
     return urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=25)
 
 
+def is_real_date(value):
+    """DATE_RE only checks shape: 2026-13-45 matches \\d{4}-\\d{2}-\\d{2} but
+    is not a real date (month 13, day 45). A string comparison against
+    pushed_at would silently accept it as a boundary anyway, so a typo one
+    keystroke off from a real date would run without complaint and just
+    quietly compare against a date that never existed."""
+    if not DATE_RE.match(value or ""):
+        return False
+    try:
+        datetime.date.fromisoformat(value)
+        return True
+    except ValueError:
+        return False
+
+
 def resolve_baseline(resume_json, since_param):
     """since= wins when well-formed; otherwise the resume file's timestamp."""
-    if DATE_RE.match(since_param or ""):
+    if is_real_date(since_param):
         return since_param, "since= override"
     try:
         chosen = (json.loads(resume_json) or {}).get("chosen") or {}
