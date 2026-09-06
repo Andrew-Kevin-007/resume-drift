@@ -116,6 +116,95 @@ LOCKFILES = [
 ]
 
 
+# --------------------------------------------------------------- js workspaces
+
+
+def _resolve_workspace_glob(root, pattern):
+    """Resolve a single workspace glob entry. Supports a literal directory and
+    one trailing '*' segment (packages/*), which covers the overwhelming
+    majority of real pnpm/npm/yarn workspace configs without pulling in a full
+    glob implementation for one path shape."""
+    pattern = pattern.strip().strip("'\"")
+    if not pattern or pattern.startswith("!"):
+        return []
+    if pattern.endswith("/*") or pattern.endswith("/**"):
+        base = pattern.rsplit("/", 1)[0]
+        base_path = os.path.join(root, base)
+        if not os.path.isdir(base_path):
+            return []
+        return [
+            os.path.join(base, name) for name in sorted(os.listdir(base_path))
+            if os.path.isdir(os.path.join(base_path, name))
+        ]
+    if os.path.isdir(os.path.join(root, pattern)):
+        return [pattern]
+    return []
+
+
+def detect_workspace_globs(root, pkg):
+    """Where to look for member packages, and which tool declared them.
+
+    pnpm-workspace.yaml takes precedence when both exist, since pnpm ignores
+    the package.json field entirely once that file is present.
+    """
+    pnpm_ws = os.path.join(root, "pnpm-workspace.yaml")
+    if os.path.exists(pnpm_ws):
+        text = read_text(pnpm_ws) or ""
+        globs = []
+        in_packages = False
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("packages:"):
+                in_packages = True
+                continue
+            if in_packages:
+                if stripped.startswith("-"):
+                    globs.append(stripped[1:].strip())
+                elif stripped and not stripped.startswith("#"):
+                    break
+        return globs, "pnpm-workspace.yaml"
+
+    if isinstance(pkg, dict):
+        ws = pkg.get("workspaces")
+        if isinstance(ws, list):
+            return ws, "package.json workspaces"
+        if isinstance(ws, dict) and isinstance(ws.get("packages"), list):
+            return ws["packages"], "package.json workspaces"
+    return [], None
+
+
+def detect_workspace_members(root, pkg):
+    """Every workspace member with its own package.json and scripts.
+
+    Reported separately from a monorepo's docker-compose services: a
+    workspace installs ONCE at the root (that is the entire point of a
+    workspace - one lockfile, hoisted dependencies), so member packages are
+    never given their own install command, only their available run scripts.
+    """
+    globs, source = detect_workspace_globs(root, pkg)
+    if not globs:
+        return [], None
+
+    members = []
+    seen = set()
+    for pattern in globs:
+        for rel in _resolve_workspace_glob(root, pattern):
+            if rel in seen:
+                continue
+            seen.add(rel)
+            member_pkg = read_json(os.path.join(root, rel, "package.json"))
+            if not isinstance(member_pkg, dict):
+                continue
+            script_name, all_scripts = pick_script(member_pkg.get("scripts"))
+            members.append({
+                "location": rel,
+                "name": member_pkg.get("name") or rel,
+                "run_script_name": script_name,
+                "all_scripts": all_scripts,
+            })
+    return members, source
+
+
 def detect_node(root, pkg):
     """Which package manager, and whether more than one lockfile disagrees.
 
@@ -473,6 +562,7 @@ def main():
 
     preflight = detect_preflight(root, pkg)
     runtime_hint = detect_runtime_hint(root)
+    workspace_members, workspace_source = detect_workspace_members(root, pkg)
 
     makefile = os.path.exists(os.path.join(root, "Makefile"))
     procfile = os.path.exists(os.path.join(root, "Procfile"))
@@ -490,6 +580,8 @@ def main():
         "services": services,
         "preflight": preflight,
         "runtime_hint": runtime_hint,
+        "workspace_members": workspace_members,
+        "workspace_source": workspace_source,
         "has_makefile": makefile,
         "has_procfile": procfile,
     }))

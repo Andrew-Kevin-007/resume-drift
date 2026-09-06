@@ -4,7 +4,7 @@
  * @rote-frontmatter
  * ---
  * name: clone-ready
- * description: 'You just cloned a repo. What do you actually run? Reads the repository on disk and hands back the exact commands, in order, so the first run after a clone is one paste instead of twenty minutes of trial and error. Picks the right package manager when more than one lockfile is present, by an actual check (packageManager field, or newest lockfile mtime, both stated) rather than a guess, and names the conflict when npm and pnpm or yarn lockfiles disagree. Diffs declared env vars in .env.example against the ones your own source code actually reads, so a var used in code but missing from the example - the one that crashes you at runtime with no clue why - is caught before you hit it. Detects Python, Go, Rust and Ruby manifests alongside Node, reports when a project has a venv but no requirements.txt at all rather than guessing a command, and reports when the project you cloned into is not the project itself - a common shape when the real code sits one folder down. Follows docker-compose.yml build contexts into a monorepo backend/frontend split and finds each services manifest where a root-only scan would report nothing to install. Notes when Postgres, MySQL, Redis, MongoDB or similar are declared as compose services. Pure filesystem reads: no network call, no package manager invoked, no file written, no credentials. Run with demo=true against a bundled fixture to see it work with no setup at all. Needs only python3.'
+ * description: 'You just cloned a repo. What do you actually run? Reads the repository on disk and hands back the exact commands, in order, so the first run after a clone is one paste instead of twenty minutes of trial and error. Picks the right package manager when more than one lockfile is present, by an actual check (packageManager field, or newest lockfile mtime, both stated) rather than a guess, and names the conflict when npm and pnpm or yarn lockfiles disagree. Diffs declared env vars in .env.example against the ones your own source code actually reads, so a var used in code but missing from the example - the one that crashes you at runtime with no clue why - is caught before you hit it. Detects Python, Go, Rust and Ruby manifests alongside Node, reports when a project has a venv but no requirements.txt at all rather than guessing a command, and reports when the project you cloned into is not the project itself - a common shape when the real code sits one folder down. Follows docker-compose.yml build contexts into a monorepo backend/frontend split and finds each services manifest where a root-only scan would report nothing to install. Recognises pnpm/npm/yarn workspaces (pnpm-workspace.yaml or a package.json workspaces field) and lists each member''s own run command in that manager''s real syntax, because a workspace installs once at the root and a root-only scan would otherwise show an install with no way to run anything. Notes when Postgres, MySQL, Redis, MongoDB or similar are declared as compose services. Pure filesystem reads: no network call, no package manager invoked, no file written, no credentials. Run with demo=true against a bundled fixture to see it work with no setup at all. Needs only python3.'
  * source: https://github.com/Andrew-Kevin-007/resume-drift
  * tags:
  * - audience-developers
@@ -19,7 +19,7 @@
  *   - onboarding
  * metadata:
  *   rote_version: 0.78.0
- *   version: 0.1.0
+ *   version: 0.1.1
  *   status: released
  *   kind: atomic
  *   flow_type: parallel
@@ -248,6 +248,29 @@ if (runnable.length === 0) {
   }
   for (const step of preflight) {
     lines.push(`  ${String(step["cmd"])}`);
+  }
+
+  // A workspace installs once at the root — that is the entire point of one
+  // lockfile and hoisted dependencies — so members never get their own
+  // install line. What they need is the one thing a root-only scan cannot
+  // show: which command runs which package, and in this manager's syntax.
+  const members = (data["workspace_members"] as Array<Record<string, unknown>> | undefined) ?? [];
+  const withScript = members.filter((m) => m["run_script_name"]);
+  if (withScript.length) {
+    const rootNode = ecosystems.find((e) => e["kind"] === "node" && e["location"] === "");
+    const mgr = String(rootNode?.["manager"] ?? "npm");
+    const filterCmd = (name: string, script: string): string => {
+      if (mgr === "pnpm") return `pnpm --filter ${name} ${script}`;
+      if (mgr === "yarn") return `yarn workspace ${name} ${script}`;
+      if (mgr === "bun") return `bun --filter ${name} ${script}`;
+      return `npm run ${script} --workspace=${name}`;
+    };
+    lines.push("");
+    lines.push(`  # this is a workspace (${String(data["workspace_source"] ?? "")}) — one install,`);
+    lines.push("  # then run whichever package you actually need:");
+    for (const m of withScript) {
+      lines.push(`  ${filterCmd(String(m["name"]), String(m["run_script_name"]))}`);
+    }
   }
 }
 lines.push("");
