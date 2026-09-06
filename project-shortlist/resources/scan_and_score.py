@@ -473,7 +473,9 @@ def verdict_for(total, flags):
 def main():
     user = arg(1)
     demo = arg(5).lower() in ("true", "1", "yes")
-    if not user and demo:
+    if demo:
+        # demo=true always wins, regardless of what github_user holds - see
+        # the identical fix and rationale in resume-drift's fetch_repos.py.
         user = "Andrew-Kevin-007"
     if not user:
         die("scan_and_score: github_user was not supplied. Pass github_user=<your-handle>\n"

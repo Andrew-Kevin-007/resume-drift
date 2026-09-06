@@ -91,7 +91,15 @@ def resolve_baseline(resume_json, since_param):
 def main():
     user = arg(1)
     demo = arg(5).lower() in ("true", "1", "yes")
-    if not user and demo:
+    if demo:
+        # demo=true always wins, regardless of what github_user holds. Rote
+        # remembers a play's parameters between runs, so a github_user from an
+        # earlier real invocation can still be present here even though this
+        # call never passed one - gating this on "not user" looked safe but
+        # meant demo=true alone could silently run against a leftover account
+        # instead of the documented demo account, which is misleading rather
+        # than broken: it still produces a real answer, just not the one the
+        # demo is supposed to show.
         user = "Andrew-Kevin-007"
     if not user:
         die("fetch_repos: github_user was not supplied. Pass github_user=<your-handle>\n"
