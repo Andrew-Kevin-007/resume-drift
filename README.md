@@ -1,30 +1,39 @@
 # resume-drift
 
-Two Rote Plays for keeping a resume honest about what you have actually built.
+Three Rote Plays for a developer's actual week: getting a fresh clone running, and
+keeping a resume honest about what got built along the way.
 
 | Play | Answers |
 |---|---|
+| **[`clone-ready`](clone-ready/)** | You just cloned a repo. What do you actually run? |
 | **`resume-drift`** (this README) | What have I shipped that my resume does not know about? |
 | **[`project-shortlist`](project-shortlist/)** | Which of my projects actually deserve the space, and what should the bullets say? |
 
-**Try either with no setup at all.** A sample resume ships with both plays, so a first
-run needs nothing from you:
+**Try any of them with no setup at all.** A fixture ships with every play, so a
+first run needs nothing from you:
 
 ```
+rote play run andrew-kevin-007/clone-ready       demo=true
 rote play run andrew-kevin-007/resume-drift      demo=true
 rote play run andrew-kevin-007/project-shortlist demo=true
 ```
 
-Then on your own resume and account:
+Then on a real clone, resume and account:
 
 ```
+rote play run andrew-kevin-007/clone-ready       root=~/code/some-repo
 rote play run andrew-kevin-007/resume-drift      github_user=<you> resume_path=~/Documents/resume.pdf
 rote play run andrew-kevin-007/project-shortlist github_user=<you> resume_path=~/Documents/resume.pdf role=backend
 ```
 
-`resume-drift` finds the gap. `project-shortlist` decides what belongs in it, judging the
-projects already on your resume by the same rubric, and drafts XYZ bullets that match your
-resume's existing style without inventing a single number.
+`clone-ready` reads a repo you just cloned and hands back the exact commands to get it
+running, plus what would have bitten you along the way — the highest-frequency task of
+the three, since it repeats on every clone rather than a few times a year.
+
+`resume-drift` finds the gap between what you shipped and what your resume says.
+`project-shortlist` decides what belongs in it, judging the projects already on your
+resume by the same rubric, and drafts XYZ bullets that match your resume's existing
+style without inventing a single number.
 
 See [NOTES.md](NOTES.md) for the build log: design decisions, the bugs found while testing,
 and the platform gotchas discovered along the way.

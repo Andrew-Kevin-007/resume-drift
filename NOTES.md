@@ -337,3 +337,90 @@ A related fix in the same pass: when GitHub cannot be read at all, the NEXT sect
 advise "ship more before applying". That is advice about projects, offered by a run that
 read no projects. It now says the rate limit blocked the run and that no conclusion about
 the projects is implied.
+
+---
+
+## 10. Reconsidering the whole direction, and Play 3 — `clone-ready`
+
+Kevin, unprompted, questioned the premise of both existing plays: "i dont think a common
+user will actually use this... there is a difference between an idea and AN IDEA." He is
+right, and the diagnosis is frequency. A resume is touched 2-4 times a year. Both plays
+also hit a real ceiling: the unauthenticated GitHub API allows 60 requests/hour, which caps
+how many times a stranger can even run them.
+
+**A registry reality check changed the strategy.** `dotisacat/playoffs-standings` (a play
+that ranks the live registry by downloads) showed 816 plays and 163 owners, with the real
+non-organiser leaders at 72-93 downloads (`sidships/headhunter`, `mahesh/tech-debt`) against
+our 1-2. Both leaders share two properties ours lacked: no rate-limit ceiling (pure local
+git/filesystem), and accumulating state that makes each run more valuable than the last.
+Also observed: one account (`ankurrawat`) published 500+ plays in a single minute, each
+sitting at 1-9 downloads - flooding the registry demonstrably does not buy adoption, which
+is reassuring evidence the leaders' numbers are real.
+
+**A dedicated judge panel on a fourth play concept was run and it failed, informatively.**
+Proposed a weekly git-based work-log ("ship-log") to fix the frequency problem directly.
+Adversarial review scored it 4.5/10, surviving 0 of 3 attacks. The load-bearing finding:
+*"the recurrence thesis is unobservable before the deadline and self-defeating after it: a
+weekly-cadence Play published Saturday gets exactly one run per user before judging."*
+Recurrence is a real product property; it does not help win a hackathon judged in 30 hours.
+Two more findings: the proposal's own headline metric (`git describe --contains`) did not
+compute what it claimed to, and the time estimate omitted the exact activity that made both
+existing plays good - iterating against real, messy data.
+
+**Kevin's own reframe won.** He asked: what if it recognises the repo you just cloned and
+gets it running - no more `npm install`, wrong directory, missing env var, guessing which
+package manager. This lands directly on the organisers' own language ("the shortcut that
+saves ten minutes... the routine task that finally stops hurting") and beats every earlier
+proposal on the property that mattered: clone frequency is far higher than resume frequency,
+it needs zero network calls (no rate limit, ever), and a dozen real cloned repos were
+already sitting on disk as test data before a line of code was written - directly answering
+the panel's "iterate against real data" objection.
+
+**What it does.** Reads a cloned repository on disk and returns the exact install/run
+sequence, plus a short list of things that would have bitten a stranger. Deliberately the
+shortest report of the three plays: the job is "what do I paste," not an audit, and per
+explicit instruction the whole design leans toward calm, low-cortisol language over the
+denser evidence-table style of the other two.
+
+**Real bugs the local test sweep caught, each on an actual cloned repo already on disk:**
+
+1. **A fabricated justification.** The lockfile-choice message originally claimed "chosen
+   because it is the newest lockfile" while the code actually picked by a fixed priority
+   list and never checked a single mtime - the exact species of dishonesty every other fix
+   in this project exists to prevent. Fixed to check real mtimes (or a real `packageManager`
+   field) and state whichever one actually decided it.
+2. **A 20.3-second run on a directory that was not a project at all.** Pointing `root=` at
+   a large personal folder (Documents) took 20s against a 30s step timeout, dangerously
+   close to failing outright. Root cause: the source-scanner's file cap only incremented on
+   files matching known source extensions, so a folder full of non-code files could be
+   walked indefinitely without ever tripping the bound. Fixed with a second, unconditional
+   cap on every file visited regardless of extension, plus skipping the scan entirely when
+   no `.env.example` exists to diff against (its result is discarded in that case anyway,
+   so running it was pure waste). Confirmed fix: 20.3s to 0.37s on the same input.
+3. **A missed monorepo shape**, found on a real repo (`Attendancetracker`) with a
+   `docker-compose.yml` building `backend/` and `frontend/` from local Dockerfiles. A
+   root-only scan reported nothing to install, which was false - both services had real
+   manifests one directory down. Fixed by parsing compose `context:` paths and re-running
+   the same ecosystem scan scoped to each one.
+4. **A miscount surfaced by the same repo**: the headline read "3 services" when only 2
+   were runnable; a stray venv-only, no-manifest finding at the repo root was being counted
+   as a third service. Separated "how many services are runnable" from "how many locations
+   produced any finding at all," and moved the stray finding out of the copy-paste block
+   entirely into the bitten-you list, where it belongs.
+5. **A blind spot in the env-var scanner**: Rust source was not scanned at all
+   (`std::env::var`), so a Rust project with `.env`/`.env.example` both present looked
+   "fully verified" when undeclared-var detection had never actually run against it. Added
+   `.rs` plus `env::var`/`os.Getenv`/`ENV[]` patterns for Rust, Go and Ruby.
+
+**Demo fixture is a static bundled directory, not a runtime-constructed one** (unlike the
+other two plays' approach) - simpler, avoids declaring any write effect for the demo path,
+and deterministic by construction. One small fixture intentionally exercises three findings
+at once: a genuine lockfile conflict (two lockfiles present, real mtime difference), one env
+var read in source but missing from `.env.example`, and a Postgres service declared in
+`docker-compose.yml`.
+
+**State:** published, public, quality score 1.00, validate and lint passing, verified
+running from its public URI. Real test sweep covered seven actual cloned repositories
+already on disk (Next.js single-lockfile, dual-lockfile conflict, Rust with Cargo.toml,
+Python with no manifest at all, a nested project root one folder down, and the
+Attendancetracker monorepo) plus both failure paths (missing directory, no parameters).
