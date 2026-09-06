@@ -470,9 +470,16 @@ def main():
     raw = arg(1)
     demo_flag = arg(2).lower() in ("true", "1", "yes")
 
-    if demo_flag and not raw:
-        # The fixture ships as a sibling directory of this script, resolved by
-        # its own location rather than passed through argv - @resource{} only
+    if demo_flag:
+        # demo=true always wins over whatever root= holds, intentional or not.
+        # Rote remembers a play's parameters between runs, so a root= from an
+        # earlier invocation can still be present here even though this call
+        # never passed one - gating this on "and not raw" looked safe in
+        # isolation but broke exactly that case: demo=true on its own, with a
+        # stale root from a previous real run, crashed on a path from a
+        # session that no longer exists instead of showing the demo. The
+        # fixture ships as a sibling directory of this script, resolved by its
+        # own location rather than passed through argv - @resource{} only
         # accepts a regular file, not a directory.
         script_dir = os.path.dirname(os.path.abspath(__file__))
         raw = os.path.join(script_dir, "demo-fixture")
