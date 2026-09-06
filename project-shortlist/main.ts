@@ -23,7 +23,7 @@
  *   - resume
  * metadata:
  *   rote_version: 0.78.0
- *   version: 0.1.4
+ *   version: 0.1.5
  *   status: released
  *   kind: atomic
  *   flow_type: parallel

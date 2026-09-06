@@ -114,12 +114,26 @@ def main():
     MIN_ALNUM = 100
     alnum = sum(1 for c in (text or "") if c.isalnum())
     if text is not None and alnum < MIN_ALNUM:
+        # The likely cause, and the fix, depend on which extractor actually ran.
+        # "Run OCR on it" is sound advice for a scanned PDF and nonsense for an
+        # RTF or plaintext file that is simply short or a placeholder.
+        if method == "pdftotext":
+            likely = (
+                "This file is almost certainly image-only or scanned, so its text "
+                "was never read. Run OCR on it, or export a text-based copy "
+                "(.docx/.md), then re-run."
+            )
+        else:
+            likely = (
+                "For a %s file this usually means the document is a placeholder, "
+                "nearly empty, or holds little more than a name and a date. "
+                "Add real content, or export a text-based copy (.docx/.md), then "
+                "re-run." % method
+            )
         method = (
             "%s ran but recovered only %d alphanumeric characters (a readable "
-            "resume has far more than %d). This file is almost certainly "
-            "image-only or scanned, so its text was never read. Run OCR on it, "
-            "or export a text-based copy (.docx/.md), then re-run."
-            % (method, alnum, MIN_ALNUM)
+            "resume has far more than %d). %s"
+            % (method, alnum, MIN_ALNUM, likely)
         )
         text = None
 
